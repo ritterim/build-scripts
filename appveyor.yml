@@ -1,0 +1,9 @@
+image: Visual Studio 2017
+
+cache:
+  - packages -> **\packages.config, nuget.config
+
+build_script:
+  - ps: ./build.ps1
+
+test: off
