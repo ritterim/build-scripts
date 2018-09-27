@@ -96,18 +96,21 @@ Task("Package")
         );
 
         var clientProjectPath = GetFiles("./src/**/*.csproj")
-            .Single(x => x.GetFilename().FullPath.ToLowerInvariant().Contains("client"))
-            .ToString();
+            .SingleOrDefault(x => x.GetFilename().FullPath.ToLowerInvariant().Contains("client"))
+            ?.ToString();
 
-        NuGetPack(clientProjectPath, new NuGetPackSettings
+        if (clientProjectPath != null)
         {
-            OutputDirectory = artifactsDir,
-            Version = packageVersion,
-            Properties = new Dictionary<string, string>
+            NuGetPack(clientProjectPath, new NuGetPackSettings
             {
-                { "Configuration", configuration }
-            }
-        });
+                OutputDirectory = artifactsDir,
+                Version = packageVersion,
+                Properties = new Dictionary<string, string>
+                {
+                    { "Configuration", configuration }
+                }
+            });
+        }
     });
 
 Task("Default")
