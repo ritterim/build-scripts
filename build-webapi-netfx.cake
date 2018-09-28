@@ -111,6 +111,27 @@ Task("Package")
                 }
             });
         }
+
+        var additionalZipDeploymentsFile = "./build-additional-zip-deployments.txt";
+
+        if (FileExists(additionalZipDeploymentsFile))
+        {
+            var additionalZipDeployments = FileReadText(additionalZipDeploymentsFile)
+                .Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => x.Trim());
+
+            foreach (var additionalZipDeployment in additionalZipDeployments)
+            {
+                var projectName = GetFiles("./src/**/*.csproj")
+                    .Single(x => x.GetFilename().FullPath == additionalZipDeployment + ".csproj")
+                    .GetFilenameWithoutExtension();
+
+                Zip(
+                    "./src/" + projectName + "/obj/" + configuration + "/Package/PackageTmp",
+                    "./artifacts/" + projectName + ".zip"
+                );
+            }
+        }
     });
 
 Task("Default")
