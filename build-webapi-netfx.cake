@@ -86,8 +86,12 @@ Task("Package")
     .Does(() =>
     {
         var hostProjectName = GetFiles("./src/**/*.csproj")
-            .Single(x => x.GetFilename().FullPath.ToLowerInvariant().Contains("api")
-                      || x.GetFilename().FullPath.ToLowerInvariant().Contains("host"))
+            .Single(x =>
+                (
+                    x.GetFilename().FullPath.ToLowerInvariant().Contains("api")
+                    || x.GetFilename().FullPath.ToLowerInvariant().Contains("host")
+                )
+                && !x.GetFilename().FullPath.ToLowerInvariant().Contains("webapi"))
             .GetFilenameWithoutExtension();
 
         Zip(
