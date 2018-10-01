@@ -95,12 +95,13 @@ Task("Package")
             "./artifacts/" + hostProjectName + ".zip"
         );
 
-        var clientProjectPath = GetFiles("./src/**/*.csproj")
-            .SingleOrDefault(x => x.GetFilename().FullPath.ToLowerInvariant().Contains("client"))
-            ?.ToString();
+        var clientProjects = GetFiles("./src/**/*.csproj")
+            .Where(x => x.GetFilename().FullPath.ToLowerInvariant().Contains("client"));
 
-        if (clientProjectPath != null)
+        foreach (var clientProject in clientProjects)
         {
+            var clientProjectPath = clientProject.ToString();
+
             NuGetPack(clientProjectPath, new NuGetPackSettings
             {
                 OutputDirectory = artifactsDir,
