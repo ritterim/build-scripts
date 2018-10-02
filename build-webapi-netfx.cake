@@ -137,6 +137,47 @@ Task("Package")
                 );
             }
         }
+
+        var additionalClientDeploymentsFile = "./build-additional-client-deployments.txt";
+
+        if (FileExists(additionalClientDeploymentsFile))
+        {
+            var additionalClientDeployments = FileReadText(additionalClientDeploymentsFile)
+                .Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => x.Trim());
+
+            foreach (var additionalClientDeployment in additionalClientDeployments)
+            {
+                string packFile;
+
+                var filePathWithoutExtension = "./src/"
+                    + additionalClientDeployment
+                    + "/"
+                    + additionalClientDeployment;
+
+                var potentialNuspec = filePathWithoutExtension + ".nuspec";
+                var potentialCsproj = filePathWithoutExtension + ".csproj";
+
+                if (FileExists(potentialNuspec))
+                {
+                    packFile = potentialNuspec;
+                }
+                else
+                {
+                    packFile = potentialCsproj;
+                }
+
+                NuGetPack(packFile, new NuGetPackSettings
+                {
+                    OutputDirectory = artifactsDir,
+                    Version = packageVersion,
+                    Properties = new Dictionary<string, string>
+                    {
+                        { "Configuration", configuration }
+                    }
+                });
+            }
+        }
     });
 
 Task("Default")
