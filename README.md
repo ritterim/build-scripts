@@ -19,13 +19,18 @@ powershell -ExecutionPolicy RemoteSigned -File ./build.ps1
 ### Create build.ps1
 
 ```powershell
-Remove-Item "build" -Recurse -ErrorAction Ignore
-New-Item -ItemType directory -Path "build" | Out-Null
+New-Item -ItemType directory -Path "build" -Force | Out-Null
 
-Invoke-WebRequest https://raw.githubusercontent.com/ritterim/build-scripts/master/bootstrap-cake.ps1 -OutFile build\bootstrap-cake.ps1
-Invoke-WebRequest https://raw.githubusercontent.com/ritterim/build-scripts/master/build-webapi-netfx.cake -OutFile build.cake
+try {
+  Invoke-WebRequest https://raw.githubusercontent.com/ritterim/build-scripts/master/bootstrap-cake.ps1 -OutFile build\bootstrap-cake.ps1
+  Invoke-WebRequest https://raw.githubusercontent.com/ritterim/build-scripts/master/build-webapi-netfx.cake -OutFile build.cake
+}
+catch {
+  Write-Output "Error while downloading shared build script, attempting to use previously downloaded scripts..."
+}
 
 .\build\bootstrap-cake.ps1
+Exit $LastExitCode
 ```
 
 ### Create version.txt
