@@ -78,7 +78,7 @@ Task("Run-Tests")
     .IsDependentOn("Build")
     .Does(() =>
     {
-        XUnit2("./tests/**/bin/" + configuration + "/*.Tests.dll");
+        XUnit2("./test*/**/bin/" + configuration + "/*.Tests.dll");
     });
 
 Task("Package")
