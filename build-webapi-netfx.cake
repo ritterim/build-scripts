@@ -113,7 +113,8 @@ Task("Package")
                 Properties = new Dictionary<string, string>
                 {
                     { "Configuration", configuration }
-                }
+                },
+                Symbols = true
             });
         }
 
@@ -174,7 +175,8 @@ Task("Package")
                     Properties = new Dictionary<string, string>
                     {
                         { "Configuration", configuration }
-                    }
+                    },
+                    Symbols = true
                 });
             }
         }
