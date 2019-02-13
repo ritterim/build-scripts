@@ -24,7 +24,10 @@ switch (AppVeyor.Environment.Repository.Branch)
         configuration = "QA";
         break;
     default:
-        configuration = "Release";
+        if (AppVeyor.Environment.Repository.Branch.StartsWith("release/"))
+            configuration = "Development";
+        else
+            configuration = "Release";
         break;
 }
 
