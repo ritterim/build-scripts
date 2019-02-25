@@ -14,24 +14,21 @@ else if (AppVeyor.Environment.Repository.Branch != "master")
     packageVersion += "-alpha" + AppVeyor.Environment.Build.Number;
 }
 
-bool isNewEnvironment = false;
+var isNewEnvironment = false;
 bool.TryParse(EnvironmentVariable("NewRitterEnvironment"), out isNewEnvironment);
 
-string configuration;
+var configuration = "Release";
 
-if (isNewEnvironment)
+if (isNewEnvironment
+    && !AppVeyor.Environment.PullRequest.IsPullRequest
+    && AppVeyor.Environment.Repository.Branch == "master")
 {
-    if (AppVeyor.Environment.Repository.Branch == "master")
-        configuration = "Development";
-    else
-        configuration = "Release";
+    configuration = "Development";
 }
-else
+else if (!AppVeyor.Environment.PullRequest.IsPullRequest
+         && AppVeyor.Environment.Repository.Branch == "development")
 {
-    if (AppVeyor.Environment.Repository.Branch == "development")
-        configuration = "QA";
-    else
-        configuration = "Release";
+    configuration = "QA";
 }
 
 var artifactsDir = Directory("./artifacts");
