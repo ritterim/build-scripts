@@ -59,7 +59,8 @@ Task("Version")
                 new AssemblyInfoSettings
                 {
                     Version = version,
-                    InformationalVersion = packageVersion
+                    InformationalVersion = packageVersion,
+                    Description = BuildSystem.AppVeyor.Environment.Repository.Commit.Id
                 });
         }
     });
