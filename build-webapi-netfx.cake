@@ -4,18 +4,19 @@
 var target = Argument("target", "Default");
 var version = FileReadText("./version.txt").Trim();
 
+var isNewEnvironment = false;
+bool.TryParse(EnvironmentVariable("NewRitterEnvironment"), out isNewEnvironment);
+
 var packageVersion = version;
 if (!AppVeyor.IsRunningOnAppVeyor)
 {
     packageVersion += "-dev";
 }
-else if (AppVeyor.Environment.Repository.Branch != "master")
+else if ((!isNewEnvironment && AppVeyor.Environment.Repository.Branch != "master")
+          || (isNewEnvironment && !AppVeyor.Environment.Repository.Branch.StartsWith("release/")))
 {
     packageVersion += "-alpha" + AppVeyor.Environment.Build.Number;
 }
-
-var isNewEnvironment = false;
-bool.TryParse(EnvironmentVariable("NewRitterEnvironment"), out isNewEnvironment);
 
 var configuration = "Release";
 
