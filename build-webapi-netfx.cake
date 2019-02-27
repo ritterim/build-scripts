@@ -1,3 +1,4 @@
+
 #addin "Cake.FileHelpers"
 #tool "nuget:?package=xunit.runner.console"
 
@@ -97,6 +98,8 @@ Task("Package")
                 )
                 && !x.GetFilename().FullPath.ToLowerInvariant().Contains("webapi"))
             .GetFilenameWithoutExtension();
+
+        System.IO.File.AppendAllText("./src/" + hostProjectName + "/obj/" + configuration + "/Package/PackageTmp/githash.txt", BuildSystem.AppVeyor.Environment.Repository.Commit.Id);
 
         Zip(
             "./src/" + hostProjectName + "/obj/" + configuration + "/Package/PackageTmp",
