@@ -1,6 +1,5 @@
-
-#addin "Cake.FileHelpers"
-#tool "nuget:?package=xunit.runner.console"
+#addin nuget:?package=Cake.FileHelpers&version=3.1.0
+#tool nuget:?package=xunit.runner.console&version=2.4.1
 
 var target = Argument("target", "Default");
 var version = FileReadText("./version.txt").Trim();
