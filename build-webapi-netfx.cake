@@ -1,5 +1,6 @@
 #addin nuget:?package=Cake.FileHelpers&version=3.1.0
 #tool nuget:?package=xunit.runner.console&version=2.4.1
+#tool nuget:?package=vswhere&version=2.6.7
 
 var target = Argument("target", "Default");
 var version = FileReadText("./version.txt").Trim();
@@ -111,17 +112,35 @@ Task("Package")
         foreach (var clientProject in clientProjects)
         {
             var clientProjectPath = clientProject.ToString();
+            var isNetstandard = FindRegexMatchesInFile(
+              clientProjectPath,
+              @"<TargetFrameworks?>.*netstandard.*<\/TargetFrameworks?>",
+              System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+              .Any();
 
-            NuGetPack(clientProjectPath, new NuGetPackSettings
+            if (isNetstandard)
             {
-                OutputDirectory = artifactsDir,
-                Version = packageVersion,
-                Properties = new Dictionary<string, string>
+                DotNetCorePack(clientProjectPath, new DotNetCorePackSettings
                 {
-                    { "Configuration", configuration }
-                },
-                Symbols = true
-            });
+                    Configuration = configuration,
+                    MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion),
+                    NoBuild = true,
+                    OutputDirectory = artifactsDir
+                });
+            }
+            else
+            {
+                NuGetPack(clientProjectPath, new NuGetPackSettings
+                {
+                    OutputDirectory = artifactsDir,
+                    Version = packageVersion,
+                    Properties = new Dictionary<string, string>
+                    {
+                        { "Configuration", configuration }
+                    },
+                    Symbols = true
+                });
+            }
         }
 
         var additionalZipDeploymentsFile = "./build-additional-zip-deployments.txt";
