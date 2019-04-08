@@ -72,7 +72,12 @@ Task("Build")
     .Does(() =>
     {
         MSBuild(solution, settings =>
-            settings.SetConfiguration(configuration)
+            settings
+                .UseToolVersion(
+                    VSWhereLatest().ToString().Contains("/Microsoft Visual Studio/2019/")
+                        ? MSBuildToolVersion.VS2019
+                        : MSBuildToolVersion.Default)
+                .SetConfiguration(configuration)
                 .WithProperty("TreatWarningsAsErrors", "True")
                 .WithProperty("DeployOnBuild", "True")
                 .SetVerbosity(Verbosity.Minimal)
