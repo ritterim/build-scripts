@@ -3,6 +3,7 @@
 Ritter Insurance Marketing project specific build scripts.
 
 - `build-webapi-netfx.cake` ASP.NET WebApi2 with full .NET framework
+- `build-netcoreapp.cake` ASP.NET Core
 
 ## Usage
 
@@ -23,7 +24,7 @@ New-Item -ItemType directory -Path "build" -Force | Out-Null
 
 try {
   Invoke-WebRequest https://raw.githubusercontent.com/ritterim/build-scripts/master/bootstrap-cake.ps1 -OutFile build\bootstrap-cake.ps1
-  Invoke-WebRequest https://raw.githubusercontent.com/ritterim/build-scripts/master/build-webapi-netfx.cake -OutFile build.cake
+  Invoke-WebRequest https://raw.githubusercontent.com/ritterim/build-scripts/master/build-[webapi-netfx OR netcoreapp].cake -OutFile build.cake
 }
 catch {
   Write-Output $_.Exception.Message
@@ -42,7 +43,7 @@ Example:
 1.0.0
 ```
 
-### Use AssemblyInfo.Generated.cs
+### Use AssemblyInfo.Generated.cs *(`build-webapi-netfx.cake` only)*
 
 If the generated file won't be included in another manner, replace `<Compile Include="Properties\AssemblyInfo.cs" />` with `<Compile Include="Properties\AssemblyInfo*.cs" />`.
 
@@ -54,6 +55,8 @@ Include:
 build/
 tools/
 build.cake
+
+# `build-webapi-netfx.cake` only
 AssemblyInfo.Generated.cs
 ```
 
