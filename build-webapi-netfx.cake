@@ -1,4 +1,4 @@
-#addin nuget:?package=Cake.FileHelpers&version=3.1.0
+#addin nuget:?package=Cake.FileHelpers&version=3.2.1
 #tool nuget:?package=xunit.runner.console&version=2.4.1
 #tool nuget:?package=vswhere&version=2.6.7
 
