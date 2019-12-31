@@ -1,6 +1,5 @@
 #addin nuget:?package=Cake.FileHelpers&version=3.2.1
 #tool nuget:?package=xunit.runner.console&version=2.4.1
-#tool nuget:?package=vswhere&version=2.6.7
 
 var target = Argument("target", "Default");
 var version = FileReadText("./version.txt").Trim();
@@ -73,10 +72,6 @@ Task("Build")
     {
         MSBuild(solution, settings =>
             settings
-                .UseToolVersion(
-                    VSWhereLatest().ToString().Contains("/Microsoft Visual Studio/2019/")
-                        ? MSBuildToolVersion.VS2019
-                        : MSBuildToolVersion.Default)
                 .SetConfiguration(configuration)
                 .WithProperty("TreatWarningsAsErrors", "True")
                 .WithProperty("DeployOnBuild", "True")
