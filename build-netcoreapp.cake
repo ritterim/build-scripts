@@ -107,6 +107,13 @@ Task("Package")
             hostArtifactsDir + File("githash.txt"),
             BuildSystem.AppVeyor.Environment.Repository.Commit.Id);
 
+        // work around for datetime offset problem 
+        var now = DateTime.UtcNow;
+        foreach(var file in GetFiles($"{hostArtifactsDir}/**/*.*"))
+        {
+            System.IO.File.SetLastWriteTimeUtc(file.FullPath, now);
+        }
+
         Zip(
             hostArtifactsDir,
             "./artifacts/" + hostProjectName + ".zip"
