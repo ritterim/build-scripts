@@ -2,7 +2,16 @@
 #tool nuget:?package=xunit.runner.console&version=2.4.1
 
 var target = Argument("target", "Default");
-var version = FileReadText("./version.txt").Trim();
+var versionFromFile = FileReadText("./version.txt")
+                    .Trim()
+                    .Split('.')
+                    .Take(2)
+                    .Aggregate("", (version, x) => $"{version}{x}.")
+                    .Trim('.');
+
+var buildNumber = AppVeyor.Environment.Build.Number;
+
+var version = $"{versionFromFile}.{buildNumber}";
 
 var isNewEnvironment = false;
 bool.TryParse(EnvironmentVariable("NewRitterEnvironment"), out isNewEnvironment);
@@ -15,7 +24,7 @@ if (!AppVeyor.IsRunningOnAppVeyor)
 else if ((!isNewEnvironment && AppVeyor.Environment.Repository.Branch != "master")
           || (isNewEnvironment && !AppVeyor.Environment.Repository.Branch.StartsWith("release/")))
 {
-    packageVersion += "-alpha" + AppVeyor.Environment.Build.Number;
+    packageVersion += "-alpha";
 }
 
 var configuration = "Release";
