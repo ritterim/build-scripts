@@ -7,7 +7,7 @@ var versionFromFile = FileReadText("./version.txt")
                     .Split('.')
                     .Take(2)
                     .Aggregate("", (version, x) => $"{version}{x}.")
-                    .Trim('.');;
+                    .Trim('.');
 
 var buildNumber = AppVeyor.Environment.Build.Number;
 
