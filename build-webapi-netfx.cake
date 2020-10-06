@@ -134,7 +134,8 @@ Task("Package")
                     Configuration = configuration,
                     MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion),
                     NoBuild = true,
-                    OutputDirectory = artifactsDir
+                    OutputDirectory = artifactsDir,
+                    IncludeSymbols = true
                 });
             }
             else
