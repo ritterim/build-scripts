@@ -116,7 +116,7 @@ Task("Package")
             hostArtifactsDir + File("githash.txt"),
             BuildSystem.AppVeyor.Environment.Repository.Commit.Id);
 
-        // work around for datetime offset problem 
+        // work around for datetime offset problem
         var now = DateTime.UtcNow;
         foreach(var file in GetFiles($"{hostArtifactsDir}/**/*.*"))
         {
@@ -140,7 +140,8 @@ Task("Package")
                 Configuration = configuration,
                 MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion),
                 NoBuild = true,
-                OutputDirectory = artifactsDir
+                OutputDirectory = artifactsDir,
+                IncludeSymbols = true
             });
         }
     });
