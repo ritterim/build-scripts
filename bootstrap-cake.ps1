@@ -224,7 +224,7 @@ if(-Not $SkipToolPackageRestore.IsPresent) {
 
     if ($LASTEXITCODE -ne 0) {
         Throw "An error occurred while restoring NuGet tools."
-    } elseif ($IsLinux -or $IsMacOS) {
+    } else {
         $md5Hash | Out-File $PACKAGES_CONFIG_MD5 -Encoding "ASCII"
     }
     Write-Verbose -Message ($NuGetOutput | out-string)
