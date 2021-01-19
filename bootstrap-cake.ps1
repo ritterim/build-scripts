@@ -50,6 +50,8 @@ Param(
     [string[]]$ScriptArgs
 )
 
+#Set-PSDebug -Trace 2
+
 # Attempt to set highest encryption available for SecurityProtocol.
 # See also: 
 # - https://github.com/cake-build/resources/blob/master/dotnet-framework/build.ps1
@@ -124,10 +126,13 @@ if ((Test-Path $PSScriptRoot) -and !(Test-Path $TOOLS_DIR)) {
     Write-Verbose -Message "Creating tools directory..."
     New-Item -Path $TOOLS_DIR -Type directory | out-null
 }
+Write-Verbose -Message "TOOLS_DIR=$($TOOLS_DIR)"
+Write-Verbose -Message "ADDINS_DIR=$($ADDINS_DIR)"
+Write-Verbose -Message "MODULES_DIR=$($MODULES_DIR)"
 
 # Make sure that packages.config exist.
 if (!(Test-Path $PACKAGES_CONFIG)) {
-    Write-Verbose -Message "Downloading packages.config..."
+    Write-Verbose -Message "Downloading $($PACKAGES_CONFIG)..."
     try {
         $wc = GetProxyEnabledWebClient
         $wc.DownloadFile("https://cakebuild.net/download/bootstrapper/packages", $PACKAGES_CONFIG)
@@ -158,8 +163,13 @@ if (!(Test-Path $NUGET_EXE)) {
     }
 }
 
-# Save nuget.exe path to environment to be available to child processed
+# Save to environment to be available to child processes
 $ENV:NUGET_EXE = $NUGET_EXE
+Write-Verbose -Message "Using $($NUGET_EXE)"
+if ($IsLinux -or $IsMacOS) {
+    $ENV:MONO_EXECUTABLE = $MONO_EXECUTABLE
+    Write-Verbose -Message "Using $($MONO_EXECUTABLE)"
+}
 
 # Restore tools from NuGet?
 if(-Not $SkipToolPackageRestore.IsPresent) {
