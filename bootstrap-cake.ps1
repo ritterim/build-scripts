@@ -178,7 +178,7 @@ if ($IsWindows) {
         }
     }
 } else {
-    Throw "Running on unknown operating system."
+    Throw "Running on unknown operating system.  One possible fix is to upgrade to Powershell 6.0+."
 }
 
 # Try download NuGet.exe if not exists
