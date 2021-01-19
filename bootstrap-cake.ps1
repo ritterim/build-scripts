@@ -115,6 +115,8 @@ $ADDINS_DIR = Join-Path $TOOLS_DIR "Addins"
 $MODULES_DIR = Join-Path $TOOLS_DIR "Modules"
 $NUGET_EXE = Join-Path $TOOLS_DIR "nuget.exe"
 $CAKE_EXE = Join-Path $TOOLS_DIR "Cake/Cake.exe"
+$MONO_EXECUTABLE = "mono"
+[bool] $USE_MONO = 1
 $NUGET_URL = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
 $PACKAGES_CONFIG = Join-Path $TOOLS_DIR "packages.config"
 $PACKAGES_CONFIG_MD5 = Join-Path $TOOLS_DIR "packages.config.md5sum"
@@ -141,15 +143,42 @@ if (!(Test-Path $PACKAGES_CONFIG)) {
     }
 }
 
-# Try find NuGet.exe in path if not exists
-if (!(Test-Path $NUGET_EXE)) {
-    Write-Verbose -Message "Trying to find nuget.exe in PATH..."
-    $existingPaths = $Env:Path -Split ';' | Where-Object { (![string]::IsNullOrEmpty($_)) -and (Test-Path $_ -PathType Container) }
-    $NUGET_EXE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "nuget.exe" | Select -First 1
-    if ($NUGET_EXE_IN_PATH -ne $null -and (Test-Path $NUGET_EXE_IN_PATH.FullName)) {
-        Write-Verbose -Message "Found in PATH at $($NUGET_EXE_IN_PATH.FullName)."
-        $NUGET_EXE = $NUGET_EXE_IN_PATH.FullName
+if ($IsWindows) {
+    Write-Verbose -Message "Running on Windows"
+    $USE_MONO = 0
+    # Try find NuGet.exe in path if not exists
+    if (!(Test-Path $NUGET_EXE)) {
+        Write-Verbose -Message "Trying to find nuget.exe in PATH..."
+        $existingPaths = $Env:Path -Split ';' | Where-Object { (![string]::IsNullOrEmpty($_)) -and (Test-Path $_ -PathType Container) }
+        $NUGET_EXE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "nuget.exe" | Select -First 1
+        if ($NUGET_EXE_IN_PATH -ne $null -and (Test-Path $NUGET_EXE_IN_PATH.FullName)) {
+            Write-Verbose -Message "Found in PATH at $($NUGET_EXE_IN_PATH.FullName)."
+            $NUGET_EXE = $NUGET_EXE_IN_PATH.FullName
+        }
     }
+} elseif ($IsLinux -or $IsMacOS) {
+    Write-Verbose -Message "Running on Linux/macOS"
+    if (!(Test-Path $NUGET_EXE)) {        
+        #TODO: This block does not function as expected, and does not actually set NUGET_EXE or MONO_EXECUTABLE properly if they are in the path
+        $existingPaths = $Env:Path -Split ':' | Where-Object { (![string]::IsNullOrEmpty($_)) -and (Test-Path $_ -PathType Container) }
+        Write-Verbose -Message "Trying to find nuget in PATH..."
+        $NUGET_EXE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "nuget" | Select -First 1
+        if ($NUGET_EXE_IN_PATH -ne $null -and (Test-Path $NUGET_EXE_IN_PATH.FullName)) {
+            Write-Verbose -Message "Found in PATH at $($NUGET_EXE_IN_PATH.FullName)."
+            $NUGET_EXE = $NUGET_EXE_IN_PATH.FullName
+            $USE_MONO = 0
+        }
+        if ($USE_MONO) {
+            Write-Verbose -Message "Trying to find mono in PATH..."
+            $MONO_EXECUTABLE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "mono" | Select -First 1
+            if ($MONO_EXECUTABLE_IN_PATH -ne $null -and (Test-Path $MONO_EXECUTABLE_IN_PATH.FullName)) {
+                Write-Verbose -Message "Found in PATH at $($MONO_EXECUTABLE_IN_PATH.FullName)."
+                $MONO_EXECUTABLE = $MONO_EXECUTABLE_IN_PATH.FullName
+            }        
+        }
+    }
+} else {
+    Throw "Running on unknown operating system."
 }
 
 # Try download NuGet.exe if not exists
@@ -166,7 +195,7 @@ if (!(Test-Path $NUGET_EXE)) {
 # Save to environment to be available to child processes
 $ENV:NUGET_EXE = $NUGET_EXE
 Write-Verbose -Message "Using $($NUGET_EXE)"
-if ($IsLinux -or $IsMacOS) {
+if ($USE_MONO) {
     $ENV:MONO_EXECUTABLE = $MONO_EXECUTABLE
     Write-Verbose -Message "Using $($MONO_EXECUTABLE)"
 }
@@ -186,13 +215,16 @@ if(-Not $SkipToolPackageRestore.IsPresent) {
     }
 
     Write-Verbose -Message "Restoring tools from NuGet..."
-    $NuGetOutput = Invoke-Expression "&`"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$TOOLS_DIR`""
+    # The '&' at the start is the Invoke-Expression "Call Operator"
+    if ($USE_MONO) {
+        $NuGetOutput = Invoke-Expression "&`"$MONO_EXECUTABLE`" `"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$TOOLS_DIR`""
+    } else {
+        $NuGetOutput = Invoke-Expression "&`"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$TOOLS_DIR`""
+    }
 
     if ($LASTEXITCODE -ne 0) {
         Throw "An error occurred while restoring NuGet tools."
-    }
-    else
-    {
+    } elseif ($IsLinux -or $IsMacOS) {
         $md5Hash | Out-File $PACKAGES_CONFIG_MD5 -Encoding "ASCII"
     }
     Write-Verbose -Message ($NuGetOutput | out-string)
@@ -206,7 +238,11 @@ if (Test-Path $ADDINS_PACKAGES_CONFIG) {
     Set-Location $ADDINS_DIR
 
     Write-Verbose -Message "Restoring addins from NuGet..."
-    $NuGetOutput = Invoke-Expression "&`"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$ADDINS_DIR`""
+    if ($USE_MONO) {
+        $NuGetOutput = Invoke-Expression "&`"$MONO_EXECUTABLE`" `"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$ADDINS_DIR`""
+    } else {
+        $NuGetOutput = Invoke-Expression "&`"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$ADDINS_DIR`""
+    }
 
     if ($LASTEXITCODE -ne 0) {
         Throw "An error occurred while restoring NuGet addins."
@@ -223,7 +259,12 @@ if (Test-Path $MODULES_PACKAGES_CONFIG) {
     Set-Location $MODULES_DIR
 
     Write-Verbose -Message "Restoring modules from NuGet..."
-    $NuGetOutput = Invoke-Expression "&`"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$MODULES_DIR`""
+        
+    if ($USE_MONO) {
+        $NuGetOutput = Invoke-Expression "&`"$MONO_EXECUTABLE`" `"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$MODULES_DIR`""
+    } else {
+        $NuGetOutput = Invoke-Expression "&`"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$MODULES_DIR`""
+    }
 
     if ($LASTEXITCODE -ne 0) {
         Throw "An error occurred while restoring NuGet modules."
@@ -252,5 +293,10 @@ $cakeArguments += $ScriptArgs
 
 # Start Cake
 Write-Host "Running build script..."
-&$CAKE_EXE $cakeArguments
+if ($USE_MONO) {
+    Invoke-Expression "&`"$MONO_EXECUTABLE`" `"$CAKE_EXE`" $cakeArguments"
+} else {
+    Invoke-Expression "&`"$CAKE_EXE`" $cakeArguments"
+}
+
 exit $LASTEXITCODE
