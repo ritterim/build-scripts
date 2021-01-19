@@ -116,7 +116,7 @@ $MODULES_DIR = Join-Path $TOOLS_DIR "Modules"
 $NUGET_EXE = Join-Path $TOOLS_DIR "nuget.exe"
 $CAKE_EXE = Join-Path $TOOLS_DIR "Cake/Cake.exe"
 $MONO_EXECUTABLE = "mono"
-[bool] $USE_MONO = 1
+[bool] $USE_MONO_FOR_NUGET = 1
 $NUGET_URL = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
 $PACKAGES_CONFIG = Join-Path $TOOLS_DIR "packages.config"
 $PACKAGES_CONFIG_MD5 = Join-Path $TOOLS_DIR "packages.config.md5sum"
@@ -145,7 +145,7 @@ if (!(Test-Path $PACKAGES_CONFIG)) {
 
 if ($IsWindows) {
     Write-Verbose -Message "Running on Windows"
-    $USE_MONO = 0
+    $USE_MONO_FOR_NUGET = 0
     # Try find NuGet.exe in path if not exists
     if (!(Test-Path $NUGET_EXE)) {
         Write-Verbose -Message "Trying to find nuget.exe in PATH..."
@@ -159,16 +159,16 @@ if ($IsWindows) {
 } elseif ($IsLinux -or $IsMacOS) {
     Write-Verbose -Message "Running on Linux/macOS"
     if (!(Test-Path $NUGET_EXE)) {        
-        #TODO: This block does not function as expected, and does not actually set NUGET_EXE or MONO_EXECUTABLE properly if they are in the path
-        $existingPaths = $Env:Path -Split ':' | Where-Object { (![string]::IsNullOrEmpty($_)) -and (Test-Path $_ -PathType Container) }
+        $existingPaths = $Env:PATH -Split ':' | Where-Object { (![string]::IsNullOrEmpty($_)) -and (Test-Path $_ -PathType Container) }
         Write-Verbose -Message "Trying to find nuget in PATH..."
+        Write-Verbose -Message "ENV:PATH=$($Env:PATH)"
         $NUGET_EXE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "nuget" | Select -First 1
         if ($NUGET_EXE_IN_PATH -ne $null -and (Test-Path $NUGET_EXE_IN_PATH.FullName)) {
             Write-Verbose -Message "Found in PATH at $($NUGET_EXE_IN_PATH.FullName)."
             $NUGET_EXE = $NUGET_EXE_IN_PATH.FullName
-            $USE_MONO = 0
+            $USE_MONO_FOR_NUGET = 0
         }
-        if ($USE_MONO) {
+        if ($USE_MONO_FOR_NUGET) {
             Write-Verbose -Message "Trying to find mono in PATH..."
             $MONO_EXECUTABLE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "mono" | Select -First 1
             if ($MONO_EXECUTABLE_IN_PATH -ne $null -and (Test-Path $MONO_EXECUTABLE_IN_PATH.FullName)) {
@@ -194,10 +194,10 @@ if (!(Test-Path $NUGET_EXE)) {
 
 # Save to environment to be available to child processes
 $ENV:NUGET_EXE = $NUGET_EXE
-Write-Verbose -Message "Using $($NUGET_EXE)"
-if ($USE_MONO) {
+Write-Verbose -Message "NUGET_EXE=$($NUGET_EXE)"
+if ($USE_MONO_FOR_NUGET) {
     $ENV:MONO_EXECUTABLE = $MONO_EXECUTABLE
-    Write-Verbose -Message "Using $($MONO_EXECUTABLE)"
+    Write-Verbose -Message "Running nuget.exe using mono."
 }
 
 # Restore tools from NuGet?
@@ -216,7 +216,7 @@ if(-Not $SkipToolPackageRestore.IsPresent) {
 
     Write-Verbose -Message "Restoring tools from NuGet..."
     # The '&' at the start is the Invoke-Expression "Call Operator"
-    if ($USE_MONO) {
+    if ($USE_MONO_FOR_NUGET) {
         $NuGetOutput = Invoke-Expression "&`"$MONO_EXECUTABLE`" `"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$TOOLS_DIR`""
     } else {
         $NuGetOutput = Invoke-Expression "&`"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$TOOLS_DIR`""
@@ -238,7 +238,7 @@ if (Test-Path $ADDINS_PACKAGES_CONFIG) {
     Set-Location $ADDINS_DIR
 
     Write-Verbose -Message "Restoring addins from NuGet..."
-    if ($USE_MONO) {
+    if ($USE_MONO_FOR_NUGET) {
         $NuGetOutput = Invoke-Expression "&`"$MONO_EXECUTABLE`" `"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$ADDINS_DIR`""
     } else {
         $NuGetOutput = Invoke-Expression "&`"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$ADDINS_DIR`""
@@ -260,7 +260,7 @@ if (Test-Path $MODULES_PACKAGES_CONFIG) {
 
     Write-Verbose -Message "Restoring modules from NuGet..."
         
-    if ($USE_MONO) {
+    if ($USE_MONO_FOR_NUGET) {
         $NuGetOutput = Invoke-Expression "&`"$MONO_EXECUTABLE`" `"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$MODULES_DIR`""
     } else {
         $NuGetOutput = Invoke-Expression "&`"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$MODULES_DIR`""
@@ -293,7 +293,7 @@ $cakeArguments += $ScriptArgs
 
 # Start Cake
 Write-Host "Running build script..."
-if ($USE_MONO) {
+if ($IsLinux -or $IsMacOS) {
     Invoke-Expression "&`"$MONO_EXECUTABLE`" `"$CAKE_EXE`" $cakeArguments"
 } else {
     Invoke-Expression "&`"$CAKE_EXE`" $cakeArguments"
