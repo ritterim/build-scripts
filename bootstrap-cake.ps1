@@ -143,20 +143,7 @@ if (!(Test-Path $PACKAGES_CONFIG)) {
     }
 }
 
-if ($IsWindows) {
-    Write-Verbose -Message "Running on Windows"
-    $USE_MONO_FOR_NUGET = 0
-    # Try find NuGet.exe in path if not exists
-    if (!(Test-Path $NUGET_EXE)) {
-        Write-Verbose -Message "Trying to find nuget.exe in PATH..."
-        $existingPaths = $Env:Path -Split ';' | Where-Object { (![string]::IsNullOrEmpty($_)) -and (Test-Path $_ -PathType Container) }
-        $NUGET_EXE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "nuget.exe" | Select -First 1
-        if ($NUGET_EXE_IN_PATH -ne $null -and (Test-Path $NUGET_EXE_IN_PATH.FullName)) {
-            Write-Verbose -Message "Found in PATH at $($NUGET_EXE_IN_PATH.FullName)."
-            $NUGET_EXE = $NUGET_EXE_IN_PATH.FullName
-        }
-    }
-} elseif ($IsLinux -or $IsMacOS) {
+if ($IsLinux -or $IsMacOS) {
     Write-Verbose -Message "Running on Linux/macOS"
     if (!(Test-Path $NUGET_EXE)) {        
         $existingPaths = $Env:PATH -Split ':' | Where-Object { (![string]::IsNullOrEmpty($_)) -and (Test-Path $_ -PathType Container) }
@@ -178,7 +165,18 @@ if ($IsWindows) {
         }
     }
 } else {
-    Throw "Running on unknown operating system.  One possible fix is to upgrade to Powershell 6.0+."
+    Write-Verbose -Message "Running on Windows"
+    $USE_MONO_FOR_NUGET = 0
+    # Try find NuGet.exe in path if not exists
+    if (!(Test-Path $NUGET_EXE)) {
+        Write-Verbose -Message "Trying to find nuget.exe in PATH..."
+        $existingPaths = $Env:Path -Split ';' | Where-Object { (![string]::IsNullOrEmpty($_)) -and (Test-Path $_ -PathType Container) }
+        $NUGET_EXE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "nuget.exe" | Select -First 1
+        if ($NUGET_EXE_IN_PATH -ne $null -and (Test-Path $NUGET_EXE_IN_PATH.FullName)) {
+            Write-Verbose -Message "Found in PATH at $($NUGET_EXE_IN_PATH.FullName)."
+            $NUGET_EXE = $NUGET_EXE_IN_PATH.FullName
+        }
+    }
 }
 
 # Try download NuGet.exe if not exists
