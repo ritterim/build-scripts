@@ -50,6 +50,8 @@ Param(
     [string[]]$ScriptArgs
 )
 
+Write-Host "Starting: $($MyInvocation.MyCommand.Name) -- Jan 20 2021"
+
 #Set-PSDebug -Trace 2
 
 # Attempt to set highest encryption available for SecurityProtocol.
@@ -88,7 +90,7 @@ function MD5HashFile([string] $filePath)
     }
     finally
     {
-        if ($file -ne $null)
+        if ($null -ne $file)
         {
             $file.Dispose()
         }
@@ -149,7 +151,7 @@ if ($IsLinux -or $IsMacOS) {
         $existingPaths = $Env:PATH -Split ':' | Where-Object { (![string]::IsNullOrEmpty($_)) -and (Test-Path $_ -PathType Container) }
         Write-Verbose -Message "Trying to find nuget in PATH..."
         Write-Verbose -Message "ENV:PATH=$($Env:PATH)"
-        $NUGET_EXE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "nuget" | Select -First 1
+        $NUGET_EXE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "nuget" | Select-Object -First 1
         if ($NUGET_EXE_IN_PATH -ne $null -and (Test-Path $NUGET_EXE_IN_PATH.FullName)) {
             Write-Verbose -Message "Found in PATH at $($NUGET_EXE_IN_PATH.FullName)."
             $NUGET_EXE = $NUGET_EXE_IN_PATH.FullName
@@ -157,7 +159,7 @@ if ($IsLinux -or $IsMacOS) {
         }
         if ($USE_MONO_FOR_NUGET) {
             Write-Verbose -Message "Trying to find mono in PATH..."
-            $MONO_EXECUTABLE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "mono" | Select -First 1
+            $MONO_EXECUTABLE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "mono" | Select-Object -First 1
             if ($MONO_EXECUTABLE_IN_PATH -ne $null -and (Test-Path $MONO_EXECUTABLE_IN_PATH.FullName)) {
                 Write-Verbose -Message "Found in PATH at $($MONO_EXECUTABLE_IN_PATH.FullName)."
                 $MONO_EXECUTABLE = $MONO_EXECUTABLE_IN_PATH.FullName
@@ -167,12 +169,12 @@ if ($IsLinux -or $IsMacOS) {
 } else {
     Write-Verbose -Message "Running on Windows"
     $USE_MONO_FOR_NUGET = 0
-    # Try find NuGet.exe in path if not exists
+    # Try find NuGet.exe in path if not at build/nuget.exe location
     if (!(Test-Path $NUGET_EXE)) {
         Write-Verbose -Message "Trying to find nuget.exe in PATH..."
         $existingPaths = $Env:Path -Split ';' | Where-Object { (![string]::IsNullOrEmpty($_)) -and (Test-Path $_ -PathType Container) }
-        $NUGET_EXE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "nuget.exe" | Select -First 1
-        if ($NUGET_EXE_IN_PATH -ne $null -and (Test-Path $NUGET_EXE_IN_PATH.FullName)) {
+        $NUGET_EXE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "nuget.exe" | Select-Object -First 1
+        if ($null -ne $NUGET_EXE_IN_PATH -and (Test-Path $NUGET_EXE_IN_PATH.FullName)) {
             Write-Verbose -Message "Found in PATH at $($NUGET_EXE_IN_PATH.FullName)."
             $NUGET_EXE = $NUGET_EXE_IN_PATH.FullName
         }
