@@ -1,7 +1,11 @@
 
 $failed = $false
 
-$scripts = @(".\build-webapi-netfx.cake")
+$scripts = @(
+  ".\build-webapi-netfx.cake",
+  ".\build-netcoreapp.cake",
+  ".\build-net5.cake"
+  )
 
 # Verify $scripts do not contain compilation errors
 foreach ($script in $scripts) {
