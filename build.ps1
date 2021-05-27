@@ -5,7 +5,8 @@ $scripts = @(".\build-webapi-netfx.cake")
 
 # Verify $scripts do not contain compilation errors
 foreach ($script in $scripts) {
-  .\bootstrap-cake.ps1 -Script $script -Target Clean --exclusive
+  Write-Output ""
+  .\bootstrap-cake.ps1 -Script $script -Verbose --verbosity=Normal --Target=Clean --exclusive
 
   if ($LastExitCode -ne 0) {
       $failed = $true
