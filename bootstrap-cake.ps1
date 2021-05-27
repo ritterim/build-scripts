@@ -292,10 +292,12 @@ if ($DryRun) { $cakeArguments += "-dryrun" }
 $cakeArguments += $ScriptArgs
 
 # Start Cake
-Write-Host "Running build script..."
+Write-Host "Running build script using Cake..."
 if ($IsLinux -or $IsMacOS) {
+    Invoke-Expression "&`"$MONO_EXECUTABLE`" `"$CAKE_EXE`" --version"
     Invoke-Expression "&`"$MONO_EXECUTABLE`" `"$CAKE_EXE`" $cakeArguments"
 } else {
+    Invoke-Expression "&`"$CAKE_EXE`" --version"
     Invoke-Expression "&`"$CAKE_EXE`" $cakeArguments"
 }
 
