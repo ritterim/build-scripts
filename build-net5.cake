@@ -66,7 +66,7 @@ var DockerElasticsearchName = "test-es";
 Setup(context =>
 {
     Information("Starting up Docker test container(s).");
-    
+
     // Output a list of the pre-installed docker images on the AppVeyor instance.
     // This could help us pick images that do not have to be downloaded on every run.
     // Requires build.ps1 to call Cake with --verbosity=Diagnostic
@@ -80,29 +80,37 @@ Setup(context =>
             Filter = $"name={DockerSqlName}",
             Quiet = true,
         });
-        Information($"sqlDockerId={sqlDockerId}");
+        Information($"Existing sqlDockerId={sqlDockerId}");
         if (sqlDockerId != "") DockerStop(sqlDockerId);
 
-        // https://hub.docker.com/_/microsoft-mssql-server    
+        // https://hub.docker.com/_/microsoft-mssql-server
         DockerRun(new DockerContainerRunSettings
         {
             Detach = true,
-            Env = new string[] 
+            Env = new string[]
             {
                 "ACCEPT_EULA=Y",
-                $"SA_PASSWORD={EnvironmentVariable("RIMDEV_TEST_DOCKER_MSSQL_SA_PASSWORD")}", 
+                $"SA_PASSWORD={EnvironmentVariable("RIMDEV_TEST_DOCKER_MSSQL_SA_PASSWORD")}",
             },
             Name = DockerSqlName,
             Publish = new string[]
             {
                 "11434:1433",
             },
-            Rm = true,        
+            Rm = true,
         },
         "mcr.microsoft.com/mssql/server:2019-latest",
         null,
         null
         );
+
+        sqlDockerId = DockerPs(new DockerContainerPsSettings
+        {
+            All = true,
+            Filter = $"name={DockerSqlName}",
+            Quiet = true,
+        });
+        Information($"Created sqlDockerId={sqlDockerId}");
     }
 
     if (createElasticsearchDocker)
@@ -113,17 +121,17 @@ Setup(context =>
             Filter = $"name={DockerElasticsearchName}",
             Quiet = true,
         });
-        Information($"elasticsearchDockerId={elasticsearchDockerId}");
+        Information($"Existing elasticsearchDockerId={elasticsearchDockerId}");
         if (elasticsearchDockerId != "") DockerStop(elasticsearchDockerId);
 
-        // https://hub.docker.com/_/elasticsearch    
+        // https://hub.docker.com/_/elasticsearch
         DockerRun(new DockerContainerRunSettings
         {
             Detach = true,
-            Env = new string[] 
+            Env = new string[]
             {
                 "discovery.type=single-node",
-                "ES_JAVA_OPTS=-Xms256m -Xmx256m", 
+                "ES_JAVA_OPTS=-Xms256m -Xmx256m",
             },
             Name = DockerElasticsearchName,
             Publish = new string[]
@@ -131,12 +139,20 @@ Setup(context =>
                 "9201:9200",
                 "9301:9300",
             },
-            Rm = true,        
+            Rm = true,
         },
         "docker.elastic.co/elasticsearch/elasticsearch:6.8.13",
         null,
         null
         );
+
+        elasticsearchDockerId = DockerPs(new DockerContainerPsSettings
+        {
+            All = true,
+            Filter = $"name={DockerElasticsearchName}",
+            Quiet = true,
+        });
+        Information($"Created elasticsearchDockerId={elasticsearchDockerId}");
     }
 
     DockerPs(new DockerContainerPsSettings
@@ -157,7 +173,7 @@ Teardown(context =>
         Filter = $"name={DockerSqlName}",
         Quiet = true,
     });
-    Information($"sqlDockerId={sqlDockerId}");
+    Information($"Found sqlDockerId={sqlDockerId}");
     if (sqlDockerId != "") DockerStop(sqlDockerId);
 
     var elasticsearchDockerId = DockerPs(new DockerContainerPsSettings
@@ -166,7 +182,7 @@ Teardown(context =>
         Filter = $"name={DockerElasticsearchName}",
         Quiet = true,
     });
-    Information($"sqlDockerId={sqlDockerId}");
+    Information($"Found sqlDockerId={sqlDockerId}");
     if (elasticsearchDockerId != "") DockerStop(elasticsearchDockerId);
 });
 
@@ -206,7 +222,7 @@ Task("Run-Tests")
     .IsDependentOn("Build")
     .Does(() =>
     {
-        if (AppVeyor.IsRunningOnAppVeyor) 
+        if (AppVeyor.IsRunningOnAppVeyor)
         {
             DockerPs(new DockerContainerPsSettings());
         }
