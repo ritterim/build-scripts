@@ -1,6 +1,7 @@
 #addin nuget:?package=Cake.FileHelpers&version=3.2.1
-#tool nuget:?package=xunit.runner.console&version=2.4.1
+#addin nuget:?package=Cake.Npm&version=0.16.0
 #addin nuget:?package=Cake.Docker&version=0.11.1
+#tool nuget:?package=xunit.runner.console&version=2.4.1
 
 var target = Argument("target", "Default");
 var versionFromFile = FileReadText("./version.txt")
@@ -51,6 +52,22 @@ var solution = GetFiles("./**/*.sln").First().ToString();
 Information($"packageVersion={packageVersion}");
 Information($"configuration={configuration}");
 Information($"solution={solution}");
+
+// Look for a "host" project (named either "host" or "api")
+var hostProject = GetFiles("./src/**/*.csproj")
+    .SingleOrDefault(x =>
+        (
+            x.GetFilename().FullPath.ToLowerInvariant().Contains("api")
+            || x.GetFilename().FullPath.ToLowerInvariant().Contains("host")
+        )
+        && !x.GetFilename().FullPath.ToLowerInvariant().Contains("webapi"));
+Information($"hostProject={hostProject}");
+var hostDirectory = hostProject?.GetDirectory();
+Information($"hostDirectory={hostDirectory}");
+var npmPackageLockFile = (hostDirectory != null)
+    ? GetFiles($"{hostDirectory}/package-lock.json").SingleOrDefault()
+    : null;
+Information($"npmPackageLockFile={npmPackageLockFile}");
 
 var createElasticsearchDocker = false;
 bool.TryParse(EnvironmentVariable("RIMDEV_CREATE_TEST_DOCKER_ES"), out createElasticsearchDocker);
@@ -199,10 +216,34 @@ Task("Restore-NuGet-Packages")
         DotNetCoreRestore(solution);
     });
 
-Task("Build")
-    .IsDependentOn("Restore-NuGet-Packages")
+Task("Restore-npm-Packages")
+    .IsDependentOn("Clean")
     .Does(() =>
     {
+        if (hostDirectory is null || npmPackageLockFile is null) return;
+
+        Information($"Found NPM package-lock.json.");
+        NpmCi(new NpmCiSettings
+        {
+            LogLevel = NpmLogLevel.Warn,
+            WorkingDirectory = hostDirectory
+        });
+    });
+
+Task("Build")
+    .IsDependentOn("Restore-NuGet-Packages")
+    .IsDependentOn("Restore-npm-Packages")
+    .Does(() =>
+    {
+        if (hostDirectory != null && npmPackageLockFile != null)
+        {
+            NpmRunScript(new NpmRunScriptSettings
+            {
+                ScriptName = "webpack",
+                WorkingDirectory = hostDirectory
+            });
+        }
+
         DotNetCoreBuild(solution, new DotNetCoreBuildSettings
         {
             Configuration = configuration,
