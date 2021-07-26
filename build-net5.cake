@@ -34,16 +34,12 @@ else if ((useMasterReleaseStrategy && AppVeyor.Environment.Repository.Branch != 
 Information($"packageVersion={packageVersion}");
 
 var configuration = "Release";
-if (!useMasterReleaseStrategy
-    && !AppVeyor.Environment.PullRequest.IsPullRequest
-    && AppVeyor.Environment.Repository.Branch == "master")
+if (AppVeyor.Environment.PullRequest.IsPullRequest
+    && (useMasterReleaseStrategy && AppVeyor.Environment.Repository.Branch != "master")
+    && (!useMasterReleaseStrategy && !AppVeyor.Environment.Repository.Branch.StartsWith("release/"))
+    )
 {
-    configuration = "Development";
-}
-else if (!AppVeyor.Environment.PullRequest.IsPullRequest
-    && AppVeyor.Environment.Repository.Branch == "development")
-{
-    configuration = "QA";
+    configuration = "Debug";
 }
 Information($"configuration={configuration}");
 
