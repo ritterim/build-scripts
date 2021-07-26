@@ -1,56 +1,73 @@
 #addin nuget:?package=Cake.FileHelpers&version=3.2.1
-#tool nuget:?package=xunit.runner.console&version=2.4.1
+#addin nuget:?package=Cake.Npm&version=0.16.0
 #addin nuget:?package=Cake.Docker&version=0.11.1
+#tool nuget:?package=xunit.runner.console&version=2.4.1
 
+Information("build-net5.cake -- Jul-26-2021");
 var target = Argument("target", "Default");
-var versionFromFile = FileReadText("./version.txt")
-                    .Trim()
-                    .Split('.')
-                    .Take(2)
-                    .Aggregate("", (version, x) => $"{version}{x}.")
-                    .Trim('.');
 
+// RELEASE STRATEGY: old vs new git flow (master branch vs trunk-based release strategy)
+//   false (default) = only "release/*" branches result in production artifacts
+//   true = any commit to master results in production artifacts
+// Any git repo that wants to release on master, must set environment var: UseMasterReleaseStrategy=true
+var useMasterReleaseStrategy = true;
+bool.TryParse(EnvironmentVariable("UseMasterReleaseStrategy"), out useMasterReleaseStrategy);
+Information($"useMasterReleaseStrategy={useMasterReleaseStrategy}");
+
+// Calculate the version
+var versionFromFile = FileReadText("./version.txt").Trim().Split('.')
+    .Take(2).Aggregate("", (version, x) => $"{version}{x}.").Trim('.');
 var buildNumber = AppVeyor.Environment.Build.Number;
-
 var version = $"{versionFromFile}.{buildNumber}";
-
-var isNewEnvironment = false;
-bool.TryParse(EnvironmentVariable("NewRitterEnvironment"), out isNewEnvironment);
+Information($"version={version}");
 
 var packageVersion = version;
 if (!AppVeyor.IsRunningOnAppVeyor)
 {
     packageVersion += "-dev";
 }
-else if ((!isNewEnvironment && AppVeyor.Environment.Repository.Branch != "master")
-          || (isNewEnvironment && !AppVeyor.Environment.Repository.Branch.StartsWith("release/")))
+else if ((useMasterReleaseStrategy && AppVeyor.Environment.Repository.Branch != "master")
+    || (!useMasterReleaseStrategy && !AppVeyor.Environment.Repository.Branch.StartsWith("release/")))
 {
     packageVersion += "-alpha";
 }
+Information($"packageVersion={packageVersion}");
 
 var configuration = "Release";
-
-if (isNewEnvironment
+if (!useMasterReleaseStrategy
     && !AppVeyor.Environment.PullRequest.IsPullRequest
     && AppVeyor.Environment.Repository.Branch == "master")
 {
     configuration = "Development";
 }
 else if (!AppVeyor.Environment.PullRequest.IsPullRequest
-         && AppVeyor.Environment.Repository.Branch == "development")
+    && AppVeyor.Environment.Repository.Branch == "development")
 {
     configuration = "QA";
 }
+Information($"configuration={configuration}");
 
 var artifactsDir = Directory("./artifacts");
 
 // Assume a single solution per repository
 var solution = GetFiles("./**/*.sln").First().ToString();
-
-// Output information about key variables
-Information($"packageVersion={packageVersion}");
-Information($"configuration={configuration}");
 Information($"solution={solution}");
+
+// Look for a "host" project (named either "host" or "api")
+var hostProject = GetFiles("./src/**/*.csproj")
+    .SingleOrDefault(x =>
+        (
+            x.GetFilename().FullPath.ToLowerInvariant().Contains("api")
+            || x.GetFilename().FullPath.ToLowerInvariant().Contains("host")
+        )
+        && !x.GetFilename().FullPath.ToLowerInvariant().Contains("webapi"));
+Information($"hostProject={hostProject}");
+var hostDirectory = hostProject?.GetDirectory();
+Information($"hostDirectory={hostDirectory}");
+var npmPackageLockFile = (hostDirectory != null)
+    ? GetFiles($"{hostDirectory}/package-lock.json").SingleOrDefault()
+    : null;
+Information($"npmPackageLockFile={npmPackageLockFile}");
 
 var createElasticsearchDocker = false;
 bool.TryParse(EnvironmentVariable("RIMDEV_CREATE_TEST_DOCKER_ES"), out createElasticsearchDocker);
@@ -199,10 +216,34 @@ Task("Restore-NuGet-Packages")
         DotNetCoreRestore(solution);
     });
 
-Task("Build")
-    .IsDependentOn("Restore-NuGet-Packages")
+Task("Restore-npm-Packages")
+    .IsDependentOn("Clean")
     .Does(() =>
     {
+        if (hostDirectory is null || npmPackageLockFile is null) return;
+
+        Information($"Found NPM package-lock.json.");
+        NpmCi(new NpmCiSettings
+        {
+            LogLevel = NpmLogLevel.Warn,
+            WorkingDirectory = hostDirectory
+        });
+    });
+
+Task("Build")
+    .IsDependentOn("Restore-NuGet-Packages")
+    .IsDependentOn("Restore-npm-Packages")
+    .Does(() =>
+    {
+        if (hostDirectory != null && npmPackageLockFile != null)
+        {
+            NpmRunScript(new NpmRunScriptSettings
+            {
+                ScriptName = "webpack",
+                WorkingDirectory = hostDirectory
+            });
+        }
+
         DotNetCoreBuild(solution, new DotNetCoreBuildSettings
         {
             Configuration = configuration,
@@ -211,7 +252,7 @@ Task("Build")
                 TreatAllWarningsAs = MSBuildTreatAllWarningsAs.Error,
                 Verbosity = DotNetCoreVerbosity.Minimal
             }
-            .WithProperty("Version", version)
+            .SetVersion(packageVersion)
 
             // msbuild.log specified explicitly, see https://github.com/cake-build/cake/issues/1764
             .AddFileLogger(new MSBuildFileLoggerSettings { LogFile = "msbuild.log" })
@@ -238,56 +279,69 @@ Task("Package")
     .IsDependentOn("Run-Tests")
     .Does(() =>
     {
-        var hostArtifactsDir = artifactsDir + Directory("Host");
-
-        var hostProject = GetFiles("./src/**/*.csproj")
-            .Single(x =>
-                (
-                    x.GetFilename().FullPath.ToLowerInvariant().Contains("api")
-                    || x.GetFilename().FullPath.ToLowerInvariant().Contains("host")
-                )
-                && !x.GetFilename().FullPath.ToLowerInvariant().Contains("webapi"));
-
-        var hostProjectName = hostProject.GetFilenameWithoutExtension();
-
-        DotNetCorePublish(hostProject.ToString(), new DotNetCorePublishSettings
+        if (hostProject != null)
         {
-            Configuration = configuration,
-            OutputDirectory = hostArtifactsDir,
-            MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion)
-        });
+            Information($"Found a host/api project to build.");
 
-        System.IO.File.AppendAllText(
-            hostArtifactsDir + File("githash.txt"),
-            BuildSystem.AppVeyor.Environment.Repository.Commit.Id);
+            var hostArtifactsDir = artifactsDir + Directory("Host");
+            Information($"hostArtifactsDir={hostArtifactsDir}");
 
-        // work around for datetime offset problem
-        var now = DateTime.UtcNow;
-        foreach(var file in GetFiles($"{hostArtifactsDir}/**/*.*"))
-        {
-            System.IO.File.SetLastWriteTimeUtc(file.FullPath, now);
+            var hostProjectName = hostProject.GetFilenameWithoutExtension();
+            Information($"hostProjectName={hostProjectName}");
+
+            DotNetCorePublish(hostProject.ToString(), new DotNetCorePublishSettings
+            {
+                Configuration = configuration,
+                OutputDirectory = hostArtifactsDir,
+                MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion)
+            });
+
+            // add a githash.txt file to the host output directory (must be after DotNetCorePublish)
+            System.IO.File.AppendAllText(
+                hostArtifactsDir + File("githash.txt"),
+                BuildSystem.AppVeyor.Environment.Repository.Commit.Id);
+
+            // work around for datetime offset problem
+            var now = DateTime.UtcNow;
+            foreach(var file in GetFiles($"{hostArtifactsDir}/**/*.*"))
+            {
+                System.IO.File.SetLastWriteTimeUtc(file.FullPath, now);
+            }
+
+            Zip(
+                hostArtifactsDir,
+                "./artifacts/" + hostProjectName + ".zip"
+            );
         }
 
-        Zip(
-            hostArtifactsDir,
-            "./artifacts/" + hostProjectName + ".zip"
-        );
-
-        var clientProjects = GetFiles("./src/**/*.csproj")
-            .Where(x => x.GetFilename().FullPath.ToLowerInvariant().Contains("client"));
-
+        // Search for class library DLLs that need to be published to NuGet/MyGet.
+        // They must have PackageId defined in the .csproj file.
+        Information("\nSearching for csproj files with PackageId defined to create NuGet packages...");
+        var clientProjects = GetFiles("./src/**/*.csproj");
         foreach (var clientProject in clientProjects)
         {
             var clientProjectPath = clientProject.ToString();
+            Information($"\nclientProjectPath={clientProjectPath}");
 
-            DotNetCorePack(clientProjectPath, new DotNetCorePackSettings
+            // XmlPeek - https://stackoverflow.com/a/34886946
+            var packageId = XmlPeek(
+                clientProjectPath,
+                "/Project/PropertyGroup/PackageId/text()",
+                new XmlPeekSettings { SuppressWarning = true }
+                );
+            Information($"packageId={packageId}");
+
+            if (!string.IsNullOrWhiteSpace(packageId))
             {
-                Configuration = configuration,
-                MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion),
-                NoBuild = true,
-                OutputDirectory = artifactsDir,
-                IncludeSymbols = true
-            });
+                DotNetCorePack(clientProjectPath, new DotNetCorePackSettings
+                {
+                    Configuration = configuration,
+                    MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion),
+                    NoBuild = true,
+                    OutputDirectory = artifactsDir,
+                    IncludeSymbols = true
+                });
+            }
         }
     });
 
