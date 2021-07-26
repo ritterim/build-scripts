@@ -316,15 +316,27 @@ Task("Package")
             "./artifacts/" + hostProjectName + ".zip"
         );
 
-        var clientProjects = GetFiles("./src/**/*.csproj")
-            .Where(x => x.GetFilename().FullPath.ToLowerInvariant().Contains("client"));
-
+        // Search for class library DLLs that need to be published to NuGet/MyGet.
+        // They must have PackageId defined in the .csproj file.
+        Information("\nSearching for csproj files with PackageId defined to create NuGet packages...");
+        var clientProjects = GetFiles("./src/**/*.csproj");
         foreach (var clientProject in clientProjects)
         {
             var clientProjectPath = clientProject.ToString();
+            Information($"\nclientProjectPath={clientProjectPath}");
 
-            DotNetCorePack(clientProjectPath, new DotNetCorePackSettings
+            // XmlPeek - https://stackoverflow.com/a/34886946
+            var packageId = XmlPeek(
+                clientProjectPath,
+                "/Project/PropertyGroup/PackageId/text()",
+                new XmlPeekSettings { SuppressWarning = true }
+                );
+            Information($"packageId={packageId}");
+
+            if (!string.IsNullOrWhiteSpace(packageId))
             {
+                DotNetCorePack(clientProjectPath, new DotNetCorePackSettings
+                {
                 Configuration = configuration,
                 MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion),
                 NoBuild = true,
