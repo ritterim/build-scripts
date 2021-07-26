@@ -5,34 +5,36 @@
 
 Information("build-net5.cake -- Jul-26-2021");
 var target = Argument("target", "Default");
-var versionFromFile = FileReadText("./version.txt")
-                    .Trim()
-                    .Split('.')
-                    .Take(2)
-                    .Aggregate("", (version, x) => $"{version}{x}.")
-                    .Trim('.');
 
+// RELEASE STRATEGY: old vs new git flow (master branch vs trunk-based release strategy)
+//   false (default) = only "release/*" branches result in production artifacts
+//   true = any commit to master results in production artifacts
+// Any git repo that wants to release on master, must set environment var: UseMasterReleaseStrategy=true
+var useMasterReleaseStrategy = true;
+bool.TryParse(EnvironmentVariable("UseMasterReleaseStrategy"), out useMasterReleaseStrategy);
+Information($"useMasterReleaseStrategy={useMasterReleaseStrategy}");
+
+// Calculate the version
+var versionFromFile = FileReadText("./version.txt").Trim().Split('.')
+    .Take(2).Aggregate("", (version, x) => $"{version}{x}.").Trim('.');
 var buildNumber = AppVeyor.Environment.Build.Number;
-
 var version = $"{versionFromFile}.{buildNumber}";
-
-var isNewEnvironment = false;
-bool.TryParse(EnvironmentVariable("NewRitterEnvironment"), out isNewEnvironment);
+Information($"version={version}");
 
 var packageVersion = version;
 if (!AppVeyor.IsRunningOnAppVeyor)
 {
     packageVersion += "-dev";
 }
-else if ((!isNewEnvironment && AppVeyor.Environment.Repository.Branch != "master")
-          || (isNewEnvironment && !AppVeyor.Environment.Repository.Branch.StartsWith("release/")))
+else if ((useMasterReleaseStrategy && AppVeyor.Environment.Repository.Branch != "master")
+    || (!useMasterReleaseStrategy && !AppVeyor.Environment.Repository.Branch.StartsWith("release/")))
 {
     packageVersion += "-alpha";
 }
+Information($"packageVersion={packageVersion}");
 
 var configuration = "Release";
-
-if (isNewEnvironment
+if (!useMasterReleaseStrategy
     && !AppVeyor.Environment.PullRequest.IsPullRequest
     && AppVeyor.Environment.Repository.Branch == "master")
 {
@@ -43,15 +45,12 @@ else if (!AppVeyor.Environment.PullRequest.IsPullRequest
 {
     configuration = "QA";
 }
+Information($"configuration={configuration}");
 
 var artifactsDir = Directory("./artifacts");
 
 // Assume a single solution per repository
 var solution = GetFiles("./**/*.sln").First().ToString();
-
-// Output information about key variables
-Information($"packageVersion={packageVersion}");
-Information($"configuration={configuration}");
 Information($"solution={solution}");
 
 // Look for a "host" project (named either "host" or "api")
@@ -281,6 +280,7 @@ Task("Package")
     .Does(() =>
     {
         var hostArtifactsDir = artifactsDir + Directory("Host");
+            Information($"hostArtifactsDir={hostArtifactsDir}");
 
         var hostProject = GetFiles("./src/**/*.csproj")
             .Single(x =>
@@ -291,6 +291,7 @@ Task("Package")
                 && !x.GetFilename().FullPath.ToLowerInvariant().Contains("webapi"));
 
         var hostProjectName = hostProject.GetFilenameWithoutExtension();
+            Information($"hostProjectName={hostProjectName}");
 
         DotNetCorePublish(hostProject.ToString(), new DotNetCorePublishSettings
         {
