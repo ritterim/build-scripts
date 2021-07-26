@@ -41,7 +41,7 @@ if (!useMasterReleaseStrategy
     configuration = "Development";
 }
 else if (!AppVeyor.Environment.PullRequest.IsPullRequest
-         && AppVeyor.Environment.Repository.Branch == "development")
+    && AppVeyor.Environment.Repository.Branch == "development")
 {
     configuration = "QA";
 }
@@ -252,7 +252,7 @@ Task("Build")
                 TreatAllWarningsAs = MSBuildTreatAllWarningsAs.Error,
                 Verbosity = DotNetCoreVerbosity.Minimal
             }
-            .WithProperty("Version", version)
+            .SetVersion(packageVersion)
 
             // msbuild.log specified explicitly, see https://github.com/cake-build/cake/issues/1764
             .AddFileLogger(new MSBuildFileLoggerSettings { LogFile = "msbuild.log" })
@@ -279,42 +279,40 @@ Task("Package")
     .IsDependentOn("Run-Tests")
     .Does(() =>
     {
-        var hostArtifactsDir = artifactsDir + Directory("Host");
+        if (hostProject != null)
+        {
+            Information($"Found a host/api project to build.");
+
+            var hostArtifactsDir = artifactsDir + Directory("Host");
             Information($"hostArtifactsDir={hostArtifactsDir}");
 
-        var hostProject = GetFiles("./src/**/*.csproj")
-            .Single(x =>
-                (
-                    x.GetFilename().FullPath.ToLowerInvariant().Contains("api")
-                    || x.GetFilename().FullPath.ToLowerInvariant().Contains("host")
-                )
-                && !x.GetFilename().FullPath.ToLowerInvariant().Contains("webapi"));
-
-        var hostProjectName = hostProject.GetFilenameWithoutExtension();
+            var hostProjectName = hostProject.GetFilenameWithoutExtension();
             Information($"hostProjectName={hostProjectName}");
 
-        DotNetCorePublish(hostProject.ToString(), new DotNetCorePublishSettings
-        {
-            Configuration = configuration,
-            OutputDirectory = hostArtifactsDir,
-            MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion)
-        });
+            DotNetCorePublish(hostProject.ToString(), new DotNetCorePublishSettings
+            {
+                Configuration = configuration,
+                OutputDirectory = hostArtifactsDir,
+                MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion)
+            });
 
-        System.IO.File.AppendAllText(
-            hostArtifactsDir + File("githash.txt"),
-            BuildSystem.AppVeyor.Environment.Repository.Commit.Id);
+            // add a githash.txt file to the host output directory (must be after DotNetCorePublish)
+            System.IO.File.AppendAllText(
+                hostArtifactsDir + File("githash.txt"),
+                BuildSystem.AppVeyor.Environment.Repository.Commit.Id);
 
-        // work around for datetime offset problem
-        var now = DateTime.UtcNow;
-        foreach(var file in GetFiles($"{hostArtifactsDir}/**/*.*"))
-        {
-            System.IO.File.SetLastWriteTimeUtc(file.FullPath, now);
+            // work around for datetime offset problem
+            var now = DateTime.UtcNow;
+            foreach(var file in GetFiles($"{hostArtifactsDir}/**/*.*"))
+            {
+                System.IO.File.SetLastWriteTimeUtc(file.FullPath, now);
+            }
+
+            Zip(
+                hostArtifactsDir,
+                "./artifacts/" + hostProjectName + ".zip"
+            );
         }
-
-        Zip(
-            hostArtifactsDir,
-            "./artifacts/" + hostProjectName + ".zip"
-        );
 
         // Search for class library DLLs that need to be published to NuGet/MyGet.
         // They must have PackageId defined in the .csproj file.
@@ -337,12 +335,13 @@ Task("Package")
             {
                 DotNetCorePack(clientProjectPath, new DotNetCorePackSettings
                 {
-                Configuration = configuration,
-                MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion),
-                NoBuild = true,
-                OutputDirectory = artifactsDir,
-                IncludeSymbols = true
-            });
+                    Configuration = configuration,
+                    MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion),
+                    NoBuild = true,
+                    OutputDirectory = artifactsDir,
+                    IncludeSymbols = true
+                });
+            }
         }
     });
 
