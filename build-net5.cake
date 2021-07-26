@@ -34,13 +34,6 @@ else if ((useMasterReleaseStrategy && AppVeyor.Environment.Repository.Branch != 
 Information($"packageVersion={packageVersion}");
 
 var configuration = "Release";
-if (AppVeyor.Environment.PullRequest.IsPullRequest
-    && (useMasterReleaseStrategy && AppVeyor.Environment.Repository.Branch != "master")
-    && (!useMasterReleaseStrategy && !AppVeyor.Environment.Repository.Branch.StartsWith("release/"))
-    )
-{
-    configuration = "Debug";
-}
 Information($"configuration={configuration}");
 
 var artifactsDir = Directory("./artifacts");
