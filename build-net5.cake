@@ -3,6 +3,7 @@
 #addin nuget:?package=Cake.Docker&version=0.11.1
 #tool nuget:?package=xunit.runner.console&version=2.4.1
 
+Information("build-net5.cake -- Jul-26-2021");
 var target = Argument("target", "Default");
 var versionFromFile = FileReadText("./version.txt")
                     .Trim()
