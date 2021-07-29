@@ -328,7 +328,12 @@ Task("Package")
                     MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion),
                     NoBuild = true,
                     OutputDirectory = artifactsDir,
-                    IncludeSymbols = true
+                    IncludeSymbols = true,
+
+                    //TODO: Remove ArgumentCustomization, add SymbolPackageFormat once Cake 1.2 is released
+                    // https://github.com/cake-build/cake/pull/3331
+                    ArgumentCustomization = x => x.Append("-p:SymbolPackageFormat=snupkg")
+                    //SymbolPackageFormat = "snupkg",
                 });
             }
         }
