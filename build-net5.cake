@@ -3,14 +3,14 @@
 #addin nuget:?package=Cake.Docker&version=0.11.1
 #tool nuget:?package=xunit.runner.console&version=2.4.1
 
-Information("build-net5.cake -- Jul-26-2021");
+Information("build-net5.cake -- Oct-26-2021");
 var target = Argument("target", "Default");
 
 // RELEASE STRATEGY: old vs new git flow (master branch vs trunk-based release strategy)
 //   false (default) = only "release/*" branches result in production artifacts
 //   true = any commit to master results in production artifacts
 // Any git repo that wants to release on master, must set environment var: UseMasterReleaseStrategy=true
-var useMasterReleaseStrategy = true;
+var useMasterReleaseStrategy = false;
 bool.TryParse(EnvironmentVariable("UseMasterReleaseStrategy"), out useMasterReleaseStrategy);
 Information($"useMasterReleaseStrategy={useMasterReleaseStrategy}");
 
@@ -80,6 +80,13 @@ Setup(context =>
 
     if (createSqlDocker)
     {
+        var sqlPort = EnvironmentVariable("RIMDEVTESTS__SQL__PORT");
+        if (string.IsNullOrWhiteSpace(sqlPort)) sqlPort = "11434";
+        Information($"Create SQL Docker on port {sqlPort}.");
+
+        var sqlPassword = EnvironmentVariable("RIMDEVTESTS__SQL__PASSWORD");
+        if (string.IsNullOrWhiteSpace(sqlPassword)) sqlPassword = EnvironmentVariable("RIMDEV_TEST_DOCKER_MSSQL_SA_PASSWORD");
+
         var sqlDockerId = DockerPs(new DockerContainerPsSettings
         {
             All = true,
@@ -96,12 +103,12 @@ Setup(context =>
             Env = new string[]
             {
                 "ACCEPT_EULA=Y",
-                $"SA_PASSWORD={EnvironmentVariable("RIMDEV_TEST_DOCKER_MSSQL_SA_PASSWORD")}",
+                $"SA_PASSWORD={sqlPassword}",
             },
             Name = DockerSqlName,
             Publish = new string[]
             {
-                "11434:1433",
+                $"{sqlPort}:1433",
             },
             Rm = true,
         },
@@ -121,6 +128,12 @@ Setup(context =>
 
     if (createElasticsearchDocker)
     {
+        var httpPort = EnvironmentVariable("RIMDEVTESTS__ELASTICSEARCH__PORT");
+        if (string.IsNullOrWhiteSpace(httpPort)) httpPort = "9201";
+        var transportPort = EnvironmentVariable("RIMDEVTESTS__ELASTICSEARCH__TRANSPORTPORT");
+        if (string.IsNullOrWhiteSpace(transportPort)) transportPort = "9301";
+        Information($"Create Elasticsearch Docker on ports {httpPort} and {transportPort}.");
+
         var elasticsearchDockerId = DockerPs(new DockerContainerPsSettings
         {
             All = true,
@@ -142,8 +155,8 @@ Setup(context =>
             Name = DockerElasticsearchName,
             Publish = new string[]
             {
-                "9201:9200",
-                "9301:9300",
+                $"{httpPort}:9200",
+                $"{transportPort}:9300",
             },
             Rm = true,
         },
@@ -188,7 +201,7 @@ Teardown(context =>
         Filter = $"name={DockerElasticsearchName}",
         Quiet = true,
     });
-    Information($"Found sqlDockerId={sqlDockerId}");
+    Information($"Found elasticsearchDockerId={elasticsearchDockerId}");
     if (elasticsearchDockerId != "") DockerStop(elasticsearchDockerId);
 });
 
