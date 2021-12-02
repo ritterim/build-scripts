@@ -184,25 +184,31 @@ Setup(context =>
 
 Teardown(context =>
 {
-    Information("Stopping Docker test container(s).");
-
-    var sqlDockerId = DockerPs(new DockerContainerPsSettings
+    /* No need to run "docker stop" for builds under AppVeyor where the build worker is discarded.
+     * It is taking five minutes to execute "stop" under the "Visual Studio 2019" build worker.
+     */  
+    if (!AppVeyor.IsRunningOnAppVeyor)
     {
-        All = true,
-        Filter = $"name={DockerSqlName}",
-        Quiet = true,
-    });
-    Information($"Found sqlDockerId={sqlDockerId}");
-    if (sqlDockerId != "") DockerStop(sqlDockerId);
-
-    var elasticsearchDockerId = DockerPs(new DockerContainerPsSettings
-    {
-        All = true,
-        Filter = $"name={DockerElasticsearchName}",
-        Quiet = true,
-    });
-    Information($"Found elasticsearchDockerId={elasticsearchDockerId}");
-    if (elasticsearchDockerId != "") DockerStop(elasticsearchDockerId);
+        Information("Stopping Docker test container(s).");
+    
+        var sqlDockerId = DockerPs(new DockerContainerPsSettings
+        {
+            All = true,
+            Filter = $"name={DockerSqlName}",
+            Quiet = true,
+        });
+        Information($"Found sqlDockerId={sqlDockerId}");
+        if (sqlDockerId != "") DockerStop(sqlDockerId);
+    
+        var elasticsearchDockerId = DockerPs(new DockerContainerPsSettings
+        {
+            All = true,
+            Filter = $"name={DockerElasticsearchName}",
+            Quiet = true,
+        });
+        Information($"Found elasticsearchDockerId={elasticsearchDockerId}");
+        if (elasticsearchDockerId != "") DockerStop(elasticsearchDockerId);
+    }
 });
 
 Task("Clean")
