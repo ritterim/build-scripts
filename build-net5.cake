@@ -3,7 +3,7 @@
 #addin nuget:?package=Cake.Docker&version=0.11.1
 #tool nuget:?package=xunit.runner.console&version=2.4.1
 
-Information("build-net5.cake -- Oct-26-2021");
+Information("build-net5.cake -- Dec-7-2021");
 var target = Argument("target", "Default");
 
 // RELEASE STRATEGY: old vs new git flow (master branch vs trunk-based release strategy)
@@ -66,17 +66,22 @@ var createSqlDocker = false;
 bool.TryParse(EnvironmentVariable("RIMDEV_CREATE_TEST_DOCKER_SQL"), out createSqlDocker);
 Information($"createSqlDocker={createSqlDocker}");
 
+var anyDocker = createElasticsearchDocker || createSqlDocker;
+
 var DockerSqlName = "test-mssql";
 var DockerElasticsearchName = "test-es";
 
 Setup(context =>
 {
-    Information("Starting up Docker test container(s).");
+    if (anyDocker)
+    {
+        Information("Starting up Docker test container(s).");
 
-    // Output a list of the pre-installed docker images on the AppVeyor instance.
-    // This could help us pick images that do not have to be downloaded on every run.
-    // Requires build.ps1 to call Cake with --verbosity=Diagnostic
-    DockerImageLs(new DockerImageLsSettings());
+        // Output a list of the pre-installed docker images on the AppVeyor instance.
+        // This could help us pick images that do not have to be downloaded on every run.
+        // Requires build.ps1 to call Cake with --verbosity=Diagnostic
+        DockerImageLs(new DockerImageLsSettings());
+    }
 
     if (createSqlDocker)
     {
@@ -174,40 +179,46 @@ Setup(context =>
         Information($"Created elasticsearchDockerId={elasticsearchDockerId}");
     }
 
-    DockerPs(new DockerContainerPsSettings
+    if (anyDocker)
     {
-        All = true,
-        NoTrunc = true,
-        Size = true,
-    });
+        DockerPs(new DockerContainerPsSettings
+        {
+            All = true,
+            NoTrunc = true,
+            Size = true,
+        });
+    }
 });
 
 Teardown(context =>
 {
     /* No need to run "docker stop" for builds under AppVeyor where the build worker is discarded.
      * It is taking five minutes to execute "stop" under the "Visual Studio 2019" build worker.
-     */  
+     */
     if (!AppVeyor.IsRunningOnAppVeyor)
     {
-        Information("Stopping Docker test container(s).");
-    
-        var sqlDockerId = DockerPs(new DockerContainerPsSettings
+        if (anyDocker)
         {
-            All = true,
-            Filter = $"name={DockerSqlName}",
-            Quiet = true,
-        });
-        Information($"Found sqlDockerId={sqlDockerId}");
-        if (sqlDockerId != "") DockerStop(sqlDockerId);
-    
-        var elasticsearchDockerId = DockerPs(new DockerContainerPsSettings
-        {
-            All = true,
-            Filter = $"name={DockerElasticsearchName}",
-            Quiet = true,
-        });
-        Information($"Found elasticsearchDockerId={elasticsearchDockerId}");
-        if (elasticsearchDockerId != "") DockerStop(elasticsearchDockerId);
+             Information("Stopping Docker test container(s).");
+
+             var sqlDockerId = DockerPs(new DockerContainerPsSettings
+             {
+                 All = true,
+                 Filter = $"name={DockerSqlName}",
+                 Quiet = true,
+             });
+             Information($"Found sqlDockerId={sqlDockerId}");
+             if (sqlDockerId != "") DockerStop(sqlDockerId);
+
+             var elasticsearchDockerId = DockerPs(new DockerContainerPsSettings
+             {
+                 All = true,
+                 Filter = $"name={DockerElasticsearchName}",
+                 Quiet = true,
+             });
+             Information($"Found elasticsearchDockerId={elasticsearchDockerId}");
+             if (elasticsearchDockerId != "") DockerStop(elasticsearchDockerId);
+        }
     }
 });
 
