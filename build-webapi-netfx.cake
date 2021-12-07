@@ -2,6 +2,8 @@
 #tool nuget:?package=xunit.runner.console&version=2.4.1
 
 var target = Argument("target", "Default");
+Information("build-webapi-netfx.cake -- Dec-7-2021");
+
 var versionFromFile = FileReadText("./version.txt")
                     .Trim()
                     .Split('.')
@@ -45,6 +47,19 @@ var artifactsDir = Directory("./artifacts");
 
 // Assume a single solution per repository
 var solution = GetFiles("./**/*.sln").First();
+Information($"solution={solution}");
+
+// Look for a "host" project (named either "host" or "api")
+var hostProject = GetFiles("./src/**/*.csproj")
+    .SingleOrDefault(x =>
+        (
+            x.GetFilename().FullPath.ToLowerInvariant().Contains("api")
+            || x.GetFilename().FullPath.ToLowerInvariant().Contains("host")
+        )
+        && !x.GetFilename().FullPath.ToLowerInvariant().Contains("webapi"));
+Information($"hostProject={hostProject}");
+var hostDirectory = hostProject?.GetDirectory();
+Information($"hostDirectory={hostDirectory}");
 
 Task("Clean")
     .Does(() =>
@@ -99,120 +114,124 @@ Task("Package")
     .IsDependentOn("Run-Tests")
     .Does(() =>
     {
-        var hostProjectName = GetFiles("./src/**/*.csproj")
-            .Single(x =>
-                (
-                    x.GetFilename().FullPath.ToLowerInvariant().Contains("api")
-                    || x.GetFilename().FullPath.ToLowerInvariant().Contains("host")
-                )
-                && !x.GetFilename().FullPath.ToLowerInvariant().Contains("webapi"))
-            .GetFilenameWithoutExtension();
-
-        System.IO.File.AppendAllText("./src/" + hostProjectName + "/obj/" + configuration + "/Package/PackageTmp/githash.txt", BuildSystem.AppVeyor.Environment.Repository.Commit.Id);
-
-        Zip(
-            "./src/" + hostProjectName + "/obj/" + configuration + "/Package/PackageTmp",
-            "./artifacts/" + hostProjectName + ".zip"
-        );
-
-        var clientProjects = GetFiles("./src/**/*.csproj")
-            .Where(x => x.GetFilename().FullPath.ToLowerInvariant().Contains("client"));
-
-        foreach (var clientProject in clientProjects)
+        if (hostProject != null)
         {
-            var clientProjectPath = clientProject.ToString();
-            var isNetstandard = FindRegexMatchesInFile(
-              clientProjectPath,
-              @"<TargetFrameworks?>.*netstandard.*<\/TargetFrameworks?>",
-              System.Text.RegularExpressions.RegexOptions.IgnoreCase)
-              .Any();
+            Information($"Found a host/api project to build.");
 
-            if (isNetstandard)
+            var hostArtifactsDir = artifactsDir + Directory("Host");
+            Information($"hostArtifactsDir={hostArtifactsDir}");
+
+            var hostProjectName = hostProject.GetFilenameWithoutExtension();
+            Information($"hostProjectName={hostProjectName}");
+
+            System.IO.File.AppendAllText(
+                "./src/" + hostProjectName + "/obj/" + configuration + "/Package/PackageTmp/githash.txt",
+                BuildSystem.AppVeyor.Environment.Repository.Commit.Id);
+
+            Zip(
+                "./src/" + hostProjectName + "/obj/" + configuration + "/Package/PackageTmp",
+                "./artifacts/" + hostProjectName + ".zip"
+            );
+
+            var clientProjects = GetFiles("./src/**/*.csproj")
+                .Where(x => x.GetFilename().FullPath.ToLowerInvariant().Contains("client"));
+
+            foreach (var clientProject in clientProjects)
             {
-                DotNetCorePack(clientProjectPath, new DotNetCorePackSettings
+                var clientProjectPath = clientProject.ToString();
+                var isNetstandard = FindRegexMatchesInFile(
+                  clientProjectPath,
+                  @"<TargetFrameworks?>.*netstandard.*<\/TargetFrameworks?>",
+                  System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                  .Any();
+
+                if (isNetstandard)
                 {
-                    Configuration = configuration,
-                    MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion),
-                    NoBuild = true,
-                    OutputDirectory = artifactsDir,
-                    IncludeSymbols = true
-                });
-            }
-            else
-            {
-                NuGetPack(clientProjectPath, new NuGetPackSettings
-                {
-                    OutputDirectory = artifactsDir,
-                    Version = packageVersion,
-                    Properties = new Dictionary<string, string>
+                    DotNetCorePack(clientProjectPath, new DotNetCorePackSettings
                     {
-                        { "Configuration", configuration }
-                    },
-                    Symbols = true
-                });
-            }
-        }
-
-        var additionalZipDeploymentsFile = "./build-additional-zip-deployments.txt";
-
-        if (FileExists(additionalZipDeploymentsFile))
-        {
-            var additionalZipDeployments = FileReadText(additionalZipDeploymentsFile)
-                .Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(x => x.Trim());
-
-            foreach (var additionalZipDeployment in additionalZipDeployments)
-            {
-                var projectName = GetFiles("./src/**/*.csproj")
-                    .Single(x => x.GetFilename().FullPath == additionalZipDeployment + ".csproj")
-                    .GetFilenameWithoutExtension();
-
-                Zip(
-                    "./src/" + projectName + "/obj/" + configuration + "/Package/PackageTmp",
-                    "./artifacts/" + projectName + ".zip"
-                );
-            }
-        }
-
-        var additionalClientDeploymentsFile = "./build-additional-client-deployments.txt";
-
-        if (FileExists(additionalClientDeploymentsFile))
-        {
-            var additionalClientDeployments = FileReadText(additionalClientDeploymentsFile)
-                .Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(x => x.Trim());
-
-            foreach (var additionalClientDeployment in additionalClientDeployments)
-            {
-                string packFile;
-
-                var filePathWithoutExtension = "./src/"
-                    + additionalClientDeployment
-                    + "/"
-                    + additionalClientDeployment;
-
-                var potentialNuspec = filePathWithoutExtension + ".nuspec";
-                var potentialCsproj = filePathWithoutExtension + ".csproj";
-
-                if (FileExists(potentialNuspec))
-                {
-                    packFile = potentialNuspec;
+                        Configuration = configuration,
+                        MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion),
+                        NoBuild = true,
+                        OutputDirectory = artifactsDir,
+                        IncludeSymbols = true
+                    });
                 }
                 else
                 {
-                    packFile = potentialCsproj;
-                }
-
-                NuGetPack(packFile, new NuGetPackSettings
-                {
-                    OutputDirectory = artifactsDir,
-                    Version = packageVersion,
-                    Properties = new Dictionary<string, string>
+                    NuGetPack(clientProjectPath, new NuGetPackSettings
                     {
-                        { "Configuration", configuration }
-                    },
-                    Symbols = true
-                });
+                        OutputDirectory = artifactsDir,
+                        Version = packageVersion,
+                        Properties = new Dictionary<string, string>
+                        {
+                            { "Configuration", configuration }
+                        },
+                        Symbols = true
+                    });
+                }
+            }
+
+            var additionalZipDeploymentsFile = "./build-additional-zip-deployments.txt";
+
+            if (FileExists(additionalZipDeploymentsFile))
+            {
+                var additionalZipDeployments = FileReadText(additionalZipDeploymentsFile)
+                    .Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(x => x.Trim());
+
+                foreach (var additionalZipDeployment in additionalZipDeployments)
+                {
+                    var projectName = GetFiles("./src/**/*.csproj")
+                        .Single(x => x.GetFilename().FullPath == additionalZipDeployment + ".csproj")
+                        .GetFilenameWithoutExtension();
+
+                    Zip(
+                        "./src/" + projectName + "/obj/" + configuration + "/Package/PackageTmp",
+                        "./artifacts/" + projectName + ".zip"
+                    );
+                }
+            }
+
+            var additionalClientDeploymentsFile = "./build-additional-client-deployments.txt";
+
+            if (FileExists(additionalClientDeploymentsFile))
+            {
+                var additionalClientDeployments = FileReadText(additionalClientDeploymentsFile)
+                    .Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(x => x.Trim());
+
+                foreach (var additionalClientDeployment in additionalClientDeployments)
+                {
+                    string packFile;
+
+                    var filePathWithoutExtension = "./src/"
+                        + additionalClientDeployment
+                        + "/"
+                        + additionalClientDeployment;
+
+                    var potentialNuspec = filePathWithoutExtension + ".nuspec";
+                    var potentialCsproj = filePathWithoutExtension + ".csproj";
+
+                    if (FileExists(potentialNuspec))
+                    {
+                        packFile = potentialNuspec;
+                    }
+                    else
+                    {
+                        packFile = potentialCsproj;
+                    }
+
+                    NuGetPack(packFile, new NuGetPackSettings
+                    {
+                        OutputDirectory = artifactsDir,
+                        Version = packageVersion,
+                        Properties = new Dictionary<string, string>
+                        {
+                            { "Configuration", configuration }
+                        },
+                        Symbols = true
+                    });
+                }
             }
         }
     });
