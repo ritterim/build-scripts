@@ -2,7 +2,7 @@
 #tool nuget:?package=xunit.runner.console&version=2.4.1
 
 var target = Argument("target", "Default");
-Information("build-webapi-netfx.cake -- Dec-7-2021");
+Information("build-webapi-netfx.cake -- Dec-8-2021");
 
 var versionFromFile = FileReadText("./version.txt")
                     .Trim()
@@ -133,41 +133,56 @@ Task("Package")
                 "./artifacts/" + hostProjectName + ".zip"
             );
 
-            var clientProjects = GetFiles("./src/**/*.csproj")
-                .Where(x => x.GetFilename().FullPath.ToLowerInvariant().Contains("client"));
+            // Search for class library DLLs that need to be published to NuGet/MyGet.
+            // They must have PackageId defined in the .csproj file.
+            Information("\nSearching for csproj files with PackageId defined to create NuGet packages...");
+            var clientProjects = GetFiles("./src/**/*.csproj");
 
             foreach (var clientProject in clientProjects)
             {
-                var clientProjectPath = clientProject.ToString();
-                var isNetstandard = FindRegexMatchesInFile(
-                  clientProjectPath,
-                  @"<TargetFrameworks?>.*netstandard.*<\/TargetFrameworks?>",
-                  System.Text.RegularExpressions.RegexOptions.IgnoreCase)
-                  .Any();
+                // XmlPeek - https://stackoverflow.com/a/34886946
+                var packageId = XmlPeek(
+                    clientProjectPath,
+                    "/Project/PropertyGroup/PackageId/text()",
+                    new XmlPeekSettings { SuppressWarning = true }
+                    );
 
-                if (isNetstandard)
+                if (!string.IsNullOrWhiteSpace(packageId))
                 {
-                    DotNetCorePack(clientProjectPath, new DotNetCorePackSettings
+                    var clientProjectPath = clientProject.ToString();
+                    Information($"\nclientProjectPath={clientProjectPath}");
+                    Information($"packageId={packageId}");
+
+                    var isNetstandard = FindRegexMatchesInFile(
+                        clientProjectPath,
+                        @"<TargetFrameworks?>.*netstandard.*<\/TargetFrameworks?>",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                        ).Any();
+
+                    if (isNetstandard)
                     {
-                        Configuration = configuration,
-                        MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion),
-                        NoBuild = true,
-                        OutputDirectory = artifactsDir,
-                        IncludeSymbols = true
-                    });
-                }
-                else
-                {
-                    NuGetPack(clientProjectPath, new NuGetPackSettings
-                    {
-                        OutputDirectory = artifactsDir,
-                        Version = packageVersion,
-                        Properties = new Dictionary<string, string>
+                        DotNetCorePack(clientProjectPath, new DotNetCorePackSettings
                         {
-                            { "Configuration", configuration }
-                        },
-                        Symbols = true
-                    });
+                            Configuration = configuration,
+                            MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion),
+                            NoBuild = true,
+                            OutputDirectory = artifactsDir,
+                            IncludeSymbols = true
+                        });
+                    }
+                    else
+                    {
+                        NuGetPack(clientProjectPath, new NuGetPackSettings
+                        {
+                            OutputDirectory = artifactsDir,
+                            Version = packageVersion,
+                            Properties = new Dictionary<string, string>
+                            {
+                                { "Configuration", configuration }
+                            },
+                            Symbols = true
+                        });
+                    }
                 }
             }
 
