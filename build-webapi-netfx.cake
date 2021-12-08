@@ -140,6 +140,7 @@ Task("Package")
 
             foreach (var clientProject in clientProjects)
             {
+                var clientProjectPath = clientProject.ToString();
                 // XmlPeek - https://stackoverflow.com/a/34886946
                 var packageId = XmlPeek(
                     clientProjectPath,
@@ -149,7 +150,6 @@ Task("Package")
 
                 if (!string.IsNullOrWhiteSpace(packageId))
                 {
-                    var clientProjectPath = clientProject.ToString();
                     Information($"\nclientProjectPath={clientProjectPath}");
                     Information($"packageId={packageId}");
 

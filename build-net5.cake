@@ -3,7 +3,7 @@
 #addin nuget:?package=Cake.Docker&version=0.11.1
 #tool nuget:?package=xunit.runner.console&version=2.4.1
 
-Information("build-net5.cake -- Dec-7-2021");
+Information("build-net5.cake -- Dec-8-2021");
 var target = Argument("target", "Default");
 
 // RELEASE STRATEGY: old vs new git flow (master branch vs trunk-based release strategy)
@@ -340,18 +340,18 @@ Task("Package")
         foreach (var clientProject in clientProjects)
         {
             var clientProjectPath = clientProject.ToString();
-            Information($"\nclientProjectPath={clientProjectPath}");
-
             // XmlPeek - https://stackoverflow.com/a/34886946
             var packageId = XmlPeek(
                 clientProjectPath,
                 "/Project/PropertyGroup/PackageId/text()",
                 new XmlPeekSettings { SuppressWarning = true }
                 );
-            Information($"packageId={packageId}");
 
             if (!string.IsNullOrWhiteSpace(packageId))
             {
+                Information($"\nclientProjectPath={clientProjectPath}");
+                Information($"packageId={packageId}");
+
                 DotNetCorePack(clientProjectPath, new DotNetCorePackSettings
                 {
                     Configuration = configuration,
