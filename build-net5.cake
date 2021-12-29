@@ -3,7 +3,7 @@
 #addin nuget:?package=Cake.Docker&version=0.11.1
 #tool nuget:?package=xunit.runner.console&version=2.4.1
 
-Information("build-net5.cake -- Dec-8-2021");
+Information("build-net5.cake -- Dec-29-2021");
 var target = Argument("target", "Default");
 
 // RELEASE STRATEGY: old vs new git flow (master branch vs trunk-based release strategy)
@@ -58,18 +58,22 @@ var npmPackageLockFile = (hostDirectory != null)
     : null;
 Information($"npmPackageLockFile={npmPackageLockFile}");
 
+var createAzurite = false;
+bool.TryParse(EnvironmentVariable("RIMDEV_CREATE_TEST_DOCKER_AZURITE"), out createAzurite);
+Information($"createAzurite={createAzurite}");
+var DockerAzuriteName = "test-azurite";
+
 var createElasticsearchDocker = false;
 bool.TryParse(EnvironmentVariable("RIMDEV_CREATE_TEST_DOCKER_ES"), out createElasticsearchDocker);
 Information($"createElasticsearchDocker={createElasticsearchDocker}");
+var DockerElasticsearchName = "test-es";
 
 var createSqlDocker = false;
 bool.TryParse(EnvironmentVariable("RIMDEV_CREATE_TEST_DOCKER_SQL"), out createSqlDocker);
 Information($"createSqlDocker={createSqlDocker}");
-
-var anyDocker = createElasticsearchDocker || createSqlDocker;
-
 var DockerSqlName = "test-mssql";
-var DockerElasticsearchName = "test-es";
+
+var anyDocker = createAzurite || createElasticsearchDocker || createSqlDocker;
 
 Setup(context =>
 {
@@ -81,6 +85,43 @@ Setup(context =>
         // This could help us pick images that do not have to be downloaded on every run.
         // Requires build.ps1 to call Cake with --verbosity=Diagnostic
         DockerImageLs(new DockerImageLsSettings());
+    }
+
+    if (createAzurite)
+    {
+        var azuriteDockerId = DockerPs(new DockerContainerPsSettings
+        {
+            All = true,
+            Filter = $"name={DockerAzuriteName}",
+            Quiet = true,
+        });
+        Information($"Existing azuriteDockerId={azuriteDockerId}");
+        if (azuriteDockerId != "") DockerStop(azuriteDockerId);
+
+        DockerRun(new DockerContainerRunSettings
+        {
+            Detach = true,
+            Name = DockerAzuriteName,
+            Publish = new string[]
+            {
+                $"10000:10000", // blob
+                $"10001:10001", // query
+                $"10002:10002", // table
+            },
+            Rm = true,
+        },
+        "mcr.microsoft.com/azure-storage/azurite",
+        null,
+        null
+        );
+
+        azuriteDockerId = DockerPs(new DockerContainerPsSettings
+        {
+            All = true,
+            Filter = $"name={DockerAzuriteName}",
+            Quiet = true,
+        });
+        Information($"Created azuriteDockerId={azuriteDockerId}");
     }
 
     if (createSqlDocker)
