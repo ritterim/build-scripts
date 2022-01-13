@@ -328,11 +328,8 @@ Task("Run-Tests")
             DockerPs(new DockerContainerPsSettings());
         }
 
-        var projectFiles = GetFiles("./tests/**/*.csproj");
-        foreach (var file in projectFiles)
-        {
-            DotNetCoreTest(file.FullPath);
-        }
+        // use 'solution' variable (no need to scan for projects)
+        DotNetCoreTest(solution);
     });
 
 Task("Package")
