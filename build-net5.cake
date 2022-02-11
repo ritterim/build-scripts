@@ -1,9 +1,10 @@
-#addin nuget:?package=Cake.FileHelpers&version=3.2.1
-#addin nuget:?package=Cake.Npm&version=0.16.0
-#addin nuget:?package=Cake.Docker&version=0.11.1
+#addin nuget:?package=Cake.Docker&version=1.0.0
+#addin nuget:?package=Cake.FileHelpers&version=4.0.1
+#addin nuget:?package=Cake.Git&version=1.1.0
+#addin nuget:?package=Cake.Npm&version=1.0.0
 #tool nuget:?package=xunit.runner.console&version=2.4.1
 
-Information("build-net5.cake -- Dec-29-2021");
+Information("build-net5.cake -- Feb-11-2022");
 var target = Argument("target", "Default");
 
 // RELEASE STRATEGY: old vs new git flow (master branch vs trunk-based release strategy)
@@ -32,6 +33,15 @@ else if ((useMasterReleaseStrategy && AppVeyor.Environment.Repository.Branch != 
     packageVersion += "-alpha";
 }
 Information($"packageVersion={packageVersion}");
+
+// Get the current git hash
+// https://philipm.at/2018/versioning_assemblies_with_cake.html
+var gitRepo = MakeAbsolute(Directory("./"));
+var gitBranch = GitBranchCurrent(gitRepo);
+var gitShortHash = gitBranch.Tip.Sha.Substring(0, 8);
+Information($"gitShortHash={gitShortHash}");
+var informationalVersion=$"{packageVersion}+{gitShortHash}";
+Information($"informationalVersion={informationalVersion}");
 
 var configuration = "Release";
 Information($"configuration={configuration}");
@@ -313,6 +323,7 @@ Task("Build")
                 Verbosity = DotNetCoreVerbosity.Minimal
             }
             .SetVersion(packageVersion)
+            .SetInformationalVersion(informationalVersion)
 
             // msbuild.log specified explicitly, see https://github.com/cake-build/cake/issues/1764
             .AddFileLogger(new MSBuildFileLoggerSettings { LogFile = "msbuild.log" })
@@ -350,7 +361,9 @@ Task("Package")
             {
                 Configuration = configuration,
                 OutputDirectory = hostArtifactsDir,
-                MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion)
+                MSBuildSettings = new DotNetCoreMSBuildSettings()
+                    .SetVersion(packageVersion)
+                    .SetInformationalVersion(informationalVersion)
             });
 
             // add a githash.txt file to the host output directory (must be after DotNetCorePublish)
@@ -393,7 +406,9 @@ Task("Package")
                 DotNetCorePack(clientProjectPath, new DotNetCorePackSettings
                 {
                     Configuration = configuration,
-                    MSBuildSettings = new DotNetCoreMSBuildSettings().SetVersion(packageVersion),
+                    MSBuildSettings = new DotNetCoreMSBuildSettings()
+                        .SetVersion(packageVersion)
+                        .SetInformationalVersion(informationalVersion),
                     NoBuild = true,
                     OutputDirectory = artifactsDir,
                     IncludeSymbols = true,
