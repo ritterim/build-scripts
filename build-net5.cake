@@ -323,7 +323,7 @@ Task("Build")
                 Verbosity = DotNetCoreVerbosity.Minimal
             }
             .SetVersion(packageVersion)
-            .SetInformationalVersion($"{packageVersion}+{gitShortHash}")
+            .SetInformationalVersion(informationalVersion)
 
             // msbuild.log specified explicitly, see https://github.com/cake-build/cake/issues/1764
             .AddFileLogger(new MSBuildFileLoggerSettings { LogFile = "msbuild.log" })
@@ -363,7 +363,7 @@ Task("Package")
                 OutputDirectory = hostArtifactsDir,
                 MSBuildSettings = new DotNetCoreMSBuildSettings()
                     .SetVersion(packageVersion)
-                    .SetInformationalVersion($"{packageVersion}+{gitShortHash}")
+                    .SetInformationalVersion(informationalVersion)
             });
 
             // add a githash.txt file to the host output directory (must be after DotNetCorePublish)
@@ -408,7 +408,7 @@ Task("Package")
                     Configuration = configuration,
                     MSBuildSettings = new DotNetCoreMSBuildSettings()
                         .SetVersion(packageVersion)
-                        .SetInformationalVersion($"{packageVersion}+{gitShortHash}"),
+                        .SetInformationalVersion(informationalVersion),
                     NoBuild = true,
                     OutputDirectory = artifactsDir,
                     IncludeSymbols = true,
