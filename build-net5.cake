@@ -27,11 +27,6 @@ if (!AppVeyor.IsRunningOnAppVeyor)
 {
     packageVersion += "-dev";
 }
-else if ((useMasterReleaseStrategy && AppVeyor.Environment.Repository.Branch != "master")
-    || (!useMasterReleaseStrategy && !AppVeyor.Environment.Repository.Branch.StartsWith("release/")))
-{
-    packageVersion += "-alpha";
-}
 Information($"packageVersion={packageVersion}");
 
 // Get the current git hash
