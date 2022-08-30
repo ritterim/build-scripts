@@ -4,7 +4,7 @@
 #addin nuget:?package=Cake.Npm&version=1.0.0
 #tool nuget:?package=xunit.runner.console&version=2.4.1
 
-Information("build-net5.cake -- Feb-11-2022");
+Information("build-net5.cake -- Aug-22-2022");
 var target = Argument("target", "Default");
 
 // RELEASE STRATEGY: old vs new git flow (master branch vs trunk-based release strategy)
