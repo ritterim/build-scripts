@@ -2,7 +2,7 @@
 #tool nuget:?package=xunit.runner.console&version=2.4.1
 
 var target = Argument("target", "Default");
-Information("build-webapi-netfx.cake -- Dec-8-2021");
+Information("build-webapi-netfx.cake -- Aug-30-2022");
 
 var versionFromFile = FileReadText("./version.txt")
                     .Trim()
@@ -22,11 +22,6 @@ var packageVersion = version;
 if (!AppVeyor.IsRunningOnAppVeyor)
 {
     packageVersion += "-dev";
-}
-else if ((!isNewEnvironment && AppVeyor.Environment.Repository.Branch != "master")
-          || (isNewEnvironment && !AppVeyor.Environment.Repository.Branch.StartsWith("release/")))
-{
-    packageVersion += "-alpha";
 }
 
 var configuration = "Release";
